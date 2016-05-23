@@ -1,0 +1,45 @@
+<?php
+
+/**
+ * @file
+ * Install and uninstall functions for the Comment Alter module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function comment_alter_schema() {
+  $schema['comment_alter'] = [
+    'description' => 'Stores the old and new {node}.vid as altered by comment.',
+    'fields' => [
+      'cid' => [
+        'description' => 'The {comment}.cid this change refers to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+      'old_vid' => [
+        'description' => 'The old {node}.vid this change refers to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+      'new_vid' => [
+        'description' => 'The new {node}.vid this change refers to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+    ],
+    'indexes' => [
+      'new_vid' => ['new_vid'],
+      'old_vid' => ['old_vid'],
+    ],
+    'primary key' => ['cid'],
+  ];
+
+  return $schema;
+}
