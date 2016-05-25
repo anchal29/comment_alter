@@ -1,5 +1,5 @@
 <?php
 /**
 * @file
-* Allows to alter node fields from comment form.
+* Allows to alter entities from comment form.
 */
