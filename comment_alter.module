@@ -3,3 +3,30 @@
 * @file
 * Allows to alter entities from comment form.
 */
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ *Implements hook_form_FORM_ID_alter().
+ */
+function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterface $form_state) {
+  $field = $form_state->getFormObject()->getEntity();
+
+  $form['comment_alter_enabled'] = [
+    '#type' => 'checkbox',
+    '#title' => t('User may alter this field from comment.'),
+    '#weight' => $form['required']['#weight'] + 0.5,
+    '#default_value' => $field->getThirdPartySetting('comment_alter','enabled',FALSE),
+  ];
+  $form['comment_alter_enabled']['#description'] = t('This allows user to alter this field from comment attached to the parent entity');
+  $form['comment_alter_hide'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Hide alterations of this field from diffs.'),
+    '#weight' => $form['required']['#weight'] + 0.7,
+    '#default_value' => $field->getThirdPartySetting('comment_alter','hide',FALSE),
+    '#states' => [
+      'invisible' => [':input[name="comment_alter_enabled"]' => array('checked' => FALSE)],
+    ],
+  ];
+
+}
