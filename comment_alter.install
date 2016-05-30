@@ -10,7 +10,7 @@
  */
 function comment_alter_schema() {
   $schema['comment_alter'] = [
-    'description' => 'Stores the old and new {node}.vid as altered by comment.',
+    'description' => 'Stores the old and new entity revision ID as altered by comment.',
     'fields' => [
       'cid' => [
         'description' => 'The {comment}.cid this change refers to.',
@@ -20,14 +20,14 @@ function comment_alter_schema() {
         'default' => 0,
       ],
       'old_vid' => [
-        'description' => 'The old {node}.vid this change refers to.',
+        'description' => 'The old entity revision ID this change refers to.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ],
       'new_vid' => [
-        'description' => 'The new {node}.vid this change refers to.',
+        'description' => 'The new entity revision ID this change refers to.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,

@@ -25,7 +25,7 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
     '#weight' => 1,
     '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_hide', FALSE),
     '#states' => [
-      'invisible' => [':input[name="third_party_settings[comment_alter][comment_alter_enabled]"]' => array('checked' => FALSE)],
+      'invisible' => [':input[name="third_party_settings[comment_alter][comment_alter_enabled]"]' => ['checked' => FALSE],
     ],
   ];
   $form['third_party_settings']['#weight'] = $form['required']['#weight'] + 0.7;
