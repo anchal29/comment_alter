@@ -5,6 +5,8 @@
 */
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Entity\EntityInterface;
+
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -31,3 +33,33 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
   $form['third_party_settings']['#weight'] = $form['required']['#weight'] + 0.7;
 
 }
+
+/**
+ * Returns the comment alterable fields for an entity.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *   Entity object for the parent entity.
+ *
+ * @return array
+ *   An array of comment alterable fields on parent entity.
+ */
+function comment_alter_get_alterable_fields(EntityInterface $entity) {
+  // To check if the entity is fieldable or not.
+  $entity_type = $entity->getEntityType();
+  $comment_alter_fields = &drupal_static(__FUNCTION__);
+  if (!isset($comment_alter_fields[$entity])) {
+    foreach ($entity as $field_name => $field_items) {
+      $field_definition = $entity->$field_name->getFieldDefinition();
+
+      // @TODO
+      // Check whether the fields are comment alterable or not from the $field_definition()
+      $commentAlterable = $field_definition->getThirdPartySetting('comment_alter','comment_alter_enabled',FALSE);
+      if ($commentAlterable) {
+        $comment_alter_fields[$entity][] = $field_name;
+      }
+    }
+  }
+
+  return $comment_alter_fields[$entity];
+}
+
