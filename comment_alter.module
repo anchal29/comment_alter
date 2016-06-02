@@ -32,6 +32,30 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
   ];
   $form['third_party_settings']['#weight'] = $form['required']['#weight'] + 0.7;
 
+  $entity_type = explode(".",$field->getOriginalId());
+  if ($entity_type[0] == 'comment') {
+    $form['third_party_settings']['comment_alter']['comment_alter_default'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
+      '#weight' => 2,
+      '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_default', FALSE),
+      '#description' => t('Loads the field values from the latest revision of the node (instead of the current revision) when the comment form is displayed.'),
+    ];
+    $form['third_party_settings']['comment_alter']['comment_alter_diff_link'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Add a link to the usual diff of the two revisions to the links area of the comment'),
+      '#weight' => 3,
+      '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_diff_link', FALSE),
+    ];
+    $form['third_party_settings']['comment_alter']['comment_alter_root_only'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Allow altering fields only when submitting root-level comments'),
+      '#weight' => 4,
+      '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_root_only', FALSE),
+      '#description' => t('Comment altering is prevented when replying to comments'),
+    ];
+  }
+
 }
 
 /**
@@ -50,6 +74,7 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
   if (!isset($comment_alter_fields[$entity])) {
     foreach ($entity as $field_name => $field_items) {
       $field_definition = $entity->$field_name->getFieldDefinition();
+      $reqField = $field_definition->getFieldStorageDefinition();
 
       // @TODO
       // Check whether the fields are comment alterable or not from the $field_definition()
@@ -62,4 +87,3 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
 
   return $comment_alter_fields[$entity];
 }
-
