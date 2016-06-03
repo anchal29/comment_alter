@@ -32,7 +32,9 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
   ];
   $form['third_party_settings']['#weight'] = $form['required']['#weight'] + 0.7;
 
-  $entity_type = explode(".",$field->getOriginalId());
+  // @TODO
+  // Move these three options to parent entity edit form.
+  $entity_type = explode('.', $field->getOriginalId());
   if ($entity_type[0] == 'comment') {
     $form['third_party_settings']['comment_alter']['comment_alter_default'] = [
       '#type' => 'checkbox',
@@ -47,12 +49,11 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
       '#weight' => 3,
       '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_diff_link', FALSE),
     ];
-    $form['third_party_settings']['comment_alter']['comment_alter_root_only'] = [
+    $form['third_party_settings']['comment_alter']['comment_alter_reply'] = [
       '#type' => 'checkbox',
-      '#title' => t('Allow altering fields only when submitting root-level comments'),
+      '#title' => t('Allow altering fields when submitting reply comments'),
       '#weight' => 4,
       '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_root_only', FALSE),
-      '#description' => t('Comment altering is prevented when replying to comments'),
     ];
   }
 
@@ -68,22 +69,17 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
  *   An array of comment alterable fields on parent entity.
  */
 function comment_alter_get_alterable_fields(EntityInterface $entity) {
-  // To check if the entity is fieldable or not.
-  $entity_type = $entity->getEntityType();
+  $entity_type = $entity->getEntityTypeId();
+  $bundle = $entity->bundle();
   $comment_alter_fields = &drupal_static(__FUNCTION__);
-  if (!isset($comment_alter_fields[$entity])) {
-    foreach ($entity as $field_name => $field_items) {
-      $field_definition = $entity->$field_name->getFieldDefinition();
-      $reqField = $field_definition->getFieldStorageDefinition();
-
-      // @TODO
-      // Check whether the fields are comment alterable or not from the $field_definition()
-      $commentAlterable = $field_definition->getThirdPartySetting('comment_alter','comment_alter_enabled',FALSE);
-      if ($commentAlterable) {
-        $comment_alter_fields[$entity][] = $field_name;
+  if (!isset($comment_alter_fields[$entity_type][$bundle])) {
+    $field_definitions = \Drupal::entityManager()->getFieldDefinitions($entity_type, $bundle);
+    foreach ($field_definitions as $field_name => $field_item) {
+      if (is_a($field_item, 'Drupal\field\Entity\FieldConfig') && $field_item->getThirdPartySetting('comment_alter', 'comment_alter_enabled', FALSE)) {
+        $comment_alter_fields[$entity_type][$bundle][] = $field_name;
       }
     }
   }
 
-  return $comment_alter_fields[$entity];
+  return $comment_alter_fields[$entity_type][$bundle];
 }
