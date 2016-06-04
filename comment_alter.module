@@ -57,6 +57,11 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
     ];
   }
 
+  // Clearing cache to ensure that cache is removed if we select comment alter
+  // option for a field.
+  $cid = "comment_alter_fields:".$entity_type[0].":".$entity_type[1];
+  \Drupal::cache()->delete($cid);
+
 }
 
 /**
@@ -89,4 +94,13 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
   }
 
   return $comment_alter_fields[$entity_type][$bundle];
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
+  dpm(comment_alter_get_alterable_fields($parent_entity));
+
 }
