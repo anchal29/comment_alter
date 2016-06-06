@@ -59,8 +59,7 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
 
   // Clearing cache to ensure that cache is removed if we select comment alter
   // option for a field.
-  $cid = "comment_alter_fields:".$entity_type[0].":".$entity_type[1];
-  \Drupal::cache()->delete($cid);
+  \Drupal::cache()->delete('comment_alter_fields:' . $entity_type[0] . ':' . $entity_type[1]);
 
 }
 
@@ -76,7 +75,7 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
 function comment_alter_get_alterable_fields(EntityInterface $entity) {
   $entity_type = $entity->getEntityTypeId();
   $bundle = $entity->bundle();
-  $cid = "comment_alter_fields:".$entity_type.":".$bundle;
+  $cid = 'comment_alter_fields:' . $entity_type. ':' . $bundle;
   $comment_alter_fields = &drupal_static(__FUNCTION__);
   if (!isset($comment_alter_fields[$entity_type][$bundle])) {
     if ($cache = \Drupal::cache()->get($cid)) {
@@ -85,6 +84,8 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
     else {
       $field_definitions = \Drupal::entityManager()->getFieldDefinitions($entity_type, $bundle);
       foreach ($field_definitions as $field_name => $field_item) {
+        // Check if we are dealing with an actual field. For an actual field
+        // only, getThirdPartySetting method is available.
         if (is_a($field_item, 'Drupal\field\Entity\FieldConfig') && $field_item->getThirdPartySetting('comment_alter', 'comment_alter_enabled', FALSE)) {
           $comment_alter_fields[$entity_type][$bundle][] = $field_name;
         }
