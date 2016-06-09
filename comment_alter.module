@@ -6,6 +6,7 @@
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\field\Entity\FieldConfig;
 
 
 /**
@@ -72,10 +73,8 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
  * @return array
  *   An array of comment alterable fields on parent entity.
  */
-function comment_alter_get_alterable_fields(EntityInterface $entity) {
-  $entity_type = $entity->getEntityTypeId();
-  $bundle = $entity->bundle();
-  $cid = 'comment_alter_fields:' . $entity_type. ':' . $bundle;
+function comment_alter_get_alterable_fields($entity_type, $bundle) {
+  $cid = 'comment_alter_fields:' . $entity_type . ':' . $bundle;
   $comment_alter_fields = &drupal_static(__FUNCTION__);
   if (!isset($comment_alter_fields[$entity_type][$bundle])) {
     if ($cache = \Drupal::cache()->get($cid)) {
@@ -84,8 +83,8 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
     else {
       $field_definitions = \Drupal::entityManager()->getFieldDefinitions($entity_type, $bundle);
       foreach ($field_definitions as $field_name => $field_item) {
-        // Check if we are dealing with an actual field. For an actual field
-        // only, getThirdPartySetting method is available.
+        // Check if we are dealing with an actual field. The
+        // getThirdPartySetting method is available only for an actual field.
         if (is_a($field_item, 'Drupal\field\Entity\FieldConfig') && $field_item->getThirdPartySetting('comment_alter', 'comment_alter_enabled', FALSE)) {
           $comment_alter_fields[$entity_type][$bundle][] = $field_name;
         }
@@ -97,11 +96,78 @@ function comment_alter_get_alterable_fields(EntityInterface $entity) {
   return $comment_alter_fields[$entity_type][$bundle];
 }
 
+
 /**
  * Implements hook_form_BASE_FORM_ID_alter().
  */
 function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
-  dpm(comment_alter_get_alterable_fields($parent_entity));
+  $comment_entity = $form_state->getFormObject()->getEntity();
+  if (!$comment_entity->isNew()) {
+      return;
+  }
+  elseif ($comment_entity->hasParentComment()) {
+    // @todo Check if user has selected this option or not.
+    return;
+  }
+  else {
+    $parent_entity = $comment_entity->getCommentedEntity();
+    dpm(comment_alter_get_alterable_fields($parent_entity));
+  }
+}
 
+/**
+ * Implements hook_form_alter().
+ */
+function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $entity = $form_state->getFormObject()->getEntity();
+  // @todo Find suitable form alter.
+
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function comment_alter_entity_extra_field_info() {
+  $extra = [];
+  foreach (\Drupal::entityManager()->getDefinitions() as $entity_type => $entity) {
+    foreach (entity_get_bundles($entity_type) as $bundle => $bundle_info) {
+      $weight = 0;
+      if ($entity instanceof Drupal\Core\Entity\ContentEntityTypeInterface) {
+        // Store the comment bundle to actually which these comment fields
+        // belong to (i.e. the comment type), which can be used later on while
+        // adding pseudo field to comment forms.
+        // But here we will see that all these comment alterable fields will be
+        // added to a central comment bundle/comment type which is used at
+        // various parent entities. So, this is a problem as we want comment
+        // alterables because of the parent entity only not ones from other
+        // entities which has same comment type.
+        $field_definitions = \Drupal::entityManager()->getFieldDefinitions($entity_type, $bundle);
+        foreach ($field_definitions as $field_definition) {
+          // @todo Get bundle or comment type for the comment field attached to
+          // this entity.
+        }
+        $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
+        if (!empty($comment_alter_fields)) {
+          foreach ($comment_alter_fields[0] as $key => $field_name) {
+            $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
+            // @todo Get proper bundle to which this comment field belong.
+            $comment_bundle = 'comment';   //Assuming for now(As it is the default one)
+            $extra['comment'][$comment_bundle]['form'][$field_name] = [
+              'label' => $field->getLabel(),
+              'description' => $field->getDescription(),
+              'weight' => $weight,
+            ];
+            $weight++;
+          }
+          $extra['comment'][$comment_bundle]['display']['comment_alter'] = [
+          'label' => t('Comment changes'),
+          'description' => t('Changes made to the parent node\'s fields in this comment.'),
+          'weight' => -1,
+          ];
+        }
+      }
+    }
+  }
+
+  return $extra;
 }
