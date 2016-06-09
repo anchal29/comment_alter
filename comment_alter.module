@@ -111,7 +111,6 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
   }
   else {
     $parent_entity = $comment_entity->getCommentedEntity();
-    dpm(comment_alter_get_alterable_fields($parent_entity));
   }
 }
 
