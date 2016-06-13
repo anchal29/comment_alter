@@ -15,6 +15,12 @@ use Drupal\field\Entity\FieldConfig;
 function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterface $form_state) {
   $field = $form_state->getFormObject()->getEntity();
 
+  // To ensure that comment alter fields of parent entity is not present in the
+  // comment form. This case only arise if parent entity is comment itself so,
+  // removing that option.
+  if ($field->getTargetEntityTypeId() == 'comment') {
+    return;
+  }
   $form['third_party_settings']['comment_alter']['comment_alter_enabled'] = [
     '#type' => 'checkbox',
     '#title' => t('User may alter this field from comment.'),
@@ -111,6 +117,19 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
   }
   else {
     $parent_entity = $comment_entity->getCommentedEntity();
+    $comment_alterable_fields = comment_alter_get_alterable_fields($parent_entity->getEntityTypeId(), $parent_entity->bundle());
+    if (empty($comment_alterable_fields)) {
+      return;
+    }
+    // Not using entityManager::getExtraFields() because it finds the pseudo
+    // fields info directly from the hook_entity_extra_field_info() which can
+    // be tracked if we look at this change record associated patches.
+    // Link: https://www.drupal.org/node/2227585
+    // Instead using entity_get_form_display to find the field info containing
+    // respective weights of the fields so that other modules can re-order or
+    // group them for this entity type and bundle.
+    $field_infos = entity_get_form_display($comment_entity->getEntityTypeId(), $comment_entity->bundle(), 'default')->getComponents();
+    dpm($field_infos);
   }
 }
 
@@ -141,6 +160,7 @@ function comment_alter_entity_extra_field_info() {
     foreach ($field_storage_definitions as $field_name => $field_storage_definition) {
       if (!$field_storage_definition instanceof Drupal\Core\Field\BaseFieldDefinition && $field_storage_definition->getType() == 'comment') {
         $comment_bundles[$entity_type][$field_name] = $field_storage_definition->getSetting('comment_type');
+        $weight[$comment_bundles[$entity_type][$field_name]] = 0;
       }
     }
     // No need to further processing if there are no comment fields on this
@@ -149,7 +169,6 @@ function comment_alter_entity_extra_field_info() {
       continue;
     }
     foreach (entity_get_bundles($entity_type) as $bundle => $bundle_info) {
-      $weight = 0;
       // Retrieve the list of comment_alterable_fields for this entity_type's
       // current bundle.
       $comment_alterable_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
@@ -182,9 +201,9 @@ function comment_alter_entity_extra_field_info() {
           $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form']['comment_alter_' . $field_name] = [
             'label' => $field->getLabel(),
             'description' => $field->getDescription(),
-            'weight' => $weight,
+            'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
           ];
-          $weight++;
+          $weight[$comment_bundles[$entity_type][$comment_field]]++;
         }
         $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['display']['comment_alter'] = [
           'label' => t('Comment changes'),
