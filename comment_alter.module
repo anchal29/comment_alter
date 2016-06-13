@@ -118,7 +118,7 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
  * Implements hook_form_alter().
  */
 function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  $entity = $form_state->getFormObject()->getEntity();
+  return;
   // @todo Find suitable form alter.
 
 }
@@ -129,18 +129,24 @@ function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_
 function comment_alter_entity_extra_field_info() {
   $extra = [];
   $comment_bundles = [];
-  foreach (\Drupal::entityManager()->getDefinitions() as $entity_type => $entity) {
-    if (!$entity instanceof Drupal\Core\Entity\ContentEntityTypeInterface || $entity_type == 'comment') {
+  foreach (\Drupal::entityManager()->getDefinitions() as $entity_type => $entity_definition) {
+    // Handle only non-comment content entity types.
+    if (!$entity_definition instanceof Drupal\Core\Entity\ContentEntityTypeInterface || $entity_type == 'comment') {
       continue;
     }
     // Store the comment type or the comment bundle using FieldStorageDefinition
     // associated with this entity type, which can be accessed for any of its
     // bundle using the field machine name.
     $field_storage_definitions = \Drupal::entityManager()->getFieldStorageDefinitions($entity_type);
-    foreach ($field_storage_definitions as $field_storage_definition) {
+    foreach ($field_storage_definitions as $field_name => $field_storage_definition) {
       if (!$field_storage_definition instanceof Drupal\Core\Field\BaseFieldDefinition && $field_storage_definition->getType() == 'comment') {
-        $comment_bundles[$entity_type][$field_storage_definition->getName()] = $field_storage_definition->getSetting('comment_type');
+        $comment_bundles[$entity_type][$field_name] = $field_storage_definition->getSetting('comment_type');
       }
+    }
+    // No need to further processing if there are no comment fields on this
+    // content entity bundle.
+    if (empty($comment_bundles[$entity_type])) {
+      continue;
     }
     foreach (entity_get_bundles($entity_type) as $bundle => $bundle_info) {
       $weight = 0;
@@ -162,9 +168,9 @@ function comment_alter_entity_extra_field_info() {
       // and bundle in order to get comment bundle for the corresponding field.
       $comment_fields = [];
       $field_definitions = \Drupal::entityManager()->getFieldDefinitions($entity_type, $bundle);
-      foreach ($field_definitions as $field_definition) {
+      foreach ($field_definitions as $field_name => $field_definition) {
         if ($field_definition->getType() == 'comment') {
-          $comment_fields[] = $field_definition->getName();
+          $comment_fields[] = $field_name;
         }
       }
 
