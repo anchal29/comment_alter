@@ -121,14 +121,18 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
     if (empty($comment_alterable_fields)) {
       return;
     }
-    // Not using entityManager::getExtraFields() because it finds the pseudo
-    // fields info directly from the hook_entity_extra_field_info() which can
-    // be tracked if we look at this change record associated patches.
-    // @link https://www.drupal.org/node/2227585 @endlink
-    // Instead using entity_get_form_display to find the field info containing
-    // respective weights of the fields so that other modules can re-order or
-    // group them for this entity type and bundle.
-    $comment_field_infos = entity_get_form_display($comment_entity->getEntityTypeId(), $comment_entity->bundle(), 'default')->getComponents();
+    // The _comment_alter_submit_node_fields() function needs these two arrays.
+    // This one is a list of comment_alterable fields.
+    $alterable_fields = [];
+    // This one informs about comment_alterable columns per comment_alterable
+    // fields. First-level key is the field name, second-level keys (and values)
+    // are the columns which do have their form elements.
+    $alterable_columns = [];
+    // It turns out that we don't need to retrieve pseudo field's weight as
+    // here Drupal assigns the weight of pseudo fields automatically. So,
+    // we may reorder the pseudo fields and Drupal will take care of the
+    // position of its widget. Hence, we are not assigning the weight property
+    // to the field widgets that are created here.
     $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
     // Attach parent entity fields to the comment form. Do it on a copy of the
     // $form, so that we know we are only getting the field element itself and
@@ -141,10 +145,26 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
         continue;
       }
       $form['comment_alter_' . $alterable_field_name] = $node_form[$alterable_field_name];
-      // Retrieve the weights of our comment alter pseudo fields as
-      // adjusted/reordered from the manage comment fields display page.
-      $form['comment_alter_' . $alterable_field_name]['weight'] = $comment_field_infos['comment_alter_' . $alterable_field_name]['weight'];
+      // Remember that this field is alterable.
+      $alterable_fields[$alterable_field_name] = $alterable_field_name;
+      // Store the old/current field value for this alterable field.
+      $form['comment_alter_' . $alterable_field_name . '_old'] = [
+        '#type' => 'value',
+        '#value' => $parent_entity->$alterable_field_name->value,
+      ];
+      // @todo Store alterable columns for the field.
     }
+
+    if (!empty($alterable_fields)) {
+      $form['comment_alter'] = [
+        '#type' => 'value',
+        '#value' => [
+          'fields' => $alterable_fields,
+          'old_vid' => $parent_entity->getRevisionId(),
+        ],
+      ];
+    }
+      // @todo Add validate and submit functions.
   }
 }
 
