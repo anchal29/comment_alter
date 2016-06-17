@@ -7,7 +7,7 @@
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\field\Entity\FieldConfig;
-
+use Drupal\Core\Render\Element;
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -124,10 +124,6 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
     // The _comment_alter_submit_node_fields() function needs these two arrays.
     // This one is a list of comment_alterable fields.
     $alterable_fields = [];
-    // This one informs about comment_alterable columns per comment_alterable
-    // fields. First-level key is the field name, second-level keys (and values)
-    // are the columns which do have their form elements.
-    $alterable_columns = [];
     // It turns out that we don't need to retrieve pseudo field's weight as
     // here Drupal assigns the weight of pseudo fields automatically. So,
     // we may reorder the pseudo fields and Drupal will take care of the
@@ -152,7 +148,6 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
         '#type' => 'value',
         '#value' => $parent_entity->$alterable_field_name->value,
       ];
-      // @todo Store alterable columns for the field.
     }
 
     if (!empty($alterable_fields)) {
@@ -163,9 +158,60 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
           'old_vid' => $parent_entity->getRevisionId(),
         ],
       ];
+      // Adding our own afterBuild call to this form, so that we could add
+      // the column information into $form itself.
+      $form['#after_build'][] = 'comment_alter_form_comment_form_alter_after_build';
+      $form['#validate'][] = 'comment_alter_form_comment_form_alter_validate';
+      $form['#submit'][] = 'comment_alter_form_comment_form_alter_submit';
     }
-      // @todo Add validate and submit functions.
   }
+}
+
+/*
+ * Form element #after_build callback.
+ * Adds comment alterable columns to the form element.
+ */
+function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface $form_state) {
+  // This one informs about comment_alterable columns per comment_alterable
+  // fields. First-level key is the field name, second-level keys (and values)
+  // are the columns which do have their form elements.
+  $alterable_columns = [];
+  foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
+    $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
+    // Get the column info from first level if it is available there else get
+    // it from the first item. In case it is available at the first level then
+    // field_items should be string there.
+    if (is_string($field_items['0'])) {
+      $columns = $field_items;
+    }
+    else {
+      $columns = Element::children($form['comment_alter_' . $alterable_field]['widget'][0]);
+    }
+    foreach ($columns as $column) {
+      $alterable_columns[$alterable_field][$column] = $column;
+    }
+  }
+  $form['alterable_columns'] = [
+    '#type' => 'value',
+    '#value' => $alterable_columns,
+  ];
+
+  return $form;
+}
+
+/**
+ * Validation callback for the altered comment form.
+ */
+function comment_alter_form_comment_form_alter_validate($form, FormStateInterface &$form_state) {
+  dpm($form);
+  // @todo Complete the vaidation callback function.
+}
+
+/**
+ * Submit callback for the altered comment form.
+ */
+function comment_alter_form_comment_form_alter_submit($form, FormStateInterface &$form_state) {
+  // @todo Complete the submit callback function.
 }
 
 /**
