@@ -143,11 +143,6 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
       $form['comment_alter_' . $alterable_field_name] = $node_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
-      // Store the old/current field value for this alterable field.
-      $form['comment_alter_' . $alterable_field_name . '_old'] = [
-        '#type' => 'value',
-        '#value' => $parent_entity->$alterable_field_name->value,
-      ];
     }
 
     if (!empty($alterable_fields)) {
@@ -169,13 +164,17 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
 
 /*
  * Form element #after_build callback.
- * Adds comment alterable columns to the form element.
+ * Adds comment alterable columns and there values to the form element.
  */
 function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface $form_state) {
+  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
   // This one informs about comment_alterable columns per comment_alterable
   // fields. First-level key is the field name, second-level keys (and values)
   // are the columns which do have their form elements.
   $alterable_columns = [];
+  // It stores the old/current column value for all the comment
+  // alterable fields.
+  $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
     $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
     // Get the column info from first level if it is available there else get
@@ -189,7 +188,13 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
     }
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
+      $field_value[$alterable_field][$column] = $parent_entity->$alterable_field->$column;
     }
+    // Store the old/current column value for this alterable field.
+    $form['comment_alter_' . $alterable_field . '_old'] = [
+      '#type' => 'value',
+      '#value' => $field_value[$alterable_field],
+    ];
   }
   $form['alterable_columns'] = [
     '#type' => 'value',
