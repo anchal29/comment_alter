@@ -208,8 +208,11 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
  * Validation callback for the altered comment form.
  */
 function comment_alter_form_comment_form_alter_validate($form, FormStateInterface &$form_state) {
-  dpm($form);
   // @todo Complete the vaidation callback function.
+  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
+  $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
+  $parent_form_display->validateFormValues($parent_entity, $form, $form_state);
+
 }
 
 /**
