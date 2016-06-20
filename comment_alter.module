@@ -140,7 +140,7 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
       if (empty($node_form[$alterable_field_name])) {
         continue;
       }
-      $form['comment_alter_' . $alterable_field_name] = $node_form[$alterable_field_name];
+      $form[$alterable_field_name] = $node_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
     }
@@ -153,8 +153,8 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
           'old_vid' => $parent_entity->getRevisionId(),
         ],
       ];
-      // Adding our own afterBuild call to this form, so that we could add
-      // the column information into $form itself.
+      // Adding our own afterBuild call to this form, so we could add the
+      // column information into the $form itself.
       $form['#after_build'][] = 'comment_alter_form_comment_form_alter_after_build';
       $form['#validate'][] = 'comment_alter_form_comment_form_alter_validate';
       $form['#submit'][] = 'comment_alter_form_comment_form_alter_submit';
@@ -162,9 +162,9 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
   }
 }
 
-/*
- * Form element #after_build callback.
- * Adds comment alterable columns and there values to the form element.
+/**
+ * Custom #after_build callback for comment_form to add comment alterable
+ * columns info and values.
  */
 function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface $form_state) {
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
@@ -176,20 +176,15 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   // alterable fields.
   $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
-    $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
+    $field_items = Element::children($form[$alterable_field]['widget']);
     // Get the column info from first level if it is available there else get
     // it from the first item. In case it is available at the first level then
     // field_items should be string there.
-    if (is_string($field_items['0'])) {
-      $columns = $field_items;
-    }
-    else {
-      $columns = Element::children($form['comment_alter_' . $alterable_field]['widget'][0]);
-    }
+    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form[$alterable_field]['widget']['0']);
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
-      $field_value[$alterable_field][$column] = $parent_entity->$alterable_field->$column;
     }
+    $field_value[$alterable_field] = $parent_entity->$alterable_field->getValue();
     // Store the old/current column value for this alterable field.
     $form['comment_alter_' . $alterable_field . '_old'] = [
       '#type' => 'value',
@@ -220,7 +215,14 @@ function comment_alter_form_comment_form_alter_validate($form, FormStateInterfac
  */
 function comment_alter_form_comment_form_alter_submit($form, FormStateInterface &$form_state) {
   // @todo Complete the submit callback function.
+  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
+  $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
+  $parent_form_display->extractFormValues($parent_entity, $form, $form_state);
+  $parent_entity->save();
+  drupal_set_message('Parent entity alterable fields updated');
+
 }
+
 
 /**
  * Implements hook_form_alter().
@@ -287,7 +289,7 @@ function comment_alter_entity_extra_field_info() {
       foreach ($comment_fields as $comment_field) {
         foreach ($comment_alterable_fields as $field_name) {
           $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
-          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form']['comment_alter_' . $field_name] = [
+          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form'][$field_name] = [
             'label' => $field->getLabel(),
             'description' => $field->getDescription(),
             'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
