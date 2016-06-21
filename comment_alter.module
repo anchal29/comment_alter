@@ -8,6 +8,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Form\FormState;
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -133,14 +134,14 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
     // Attach parent entity fields to the comment form. Do it on a copy of the
     // $form, so that we know we are only getting the field element itself and
     // no other side-effects.
-    $node_form = $form;
-    $node_form_state = $form_state;
-    $parent_form_display->buildForm($parent_entity, $node_form, $node_form_state);
+    $parent_form = $form;
+    $parent_form_state = new FormState();
+    $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
     foreach ($comment_alterable_fields as $alterable_field_name) {
-      if (empty($node_form[$alterable_field_name])) {
+      if (empty($parent_form[$alterable_field_name])) {
         continue;
       }
-      $form[$alterable_field_name] = $node_form[$alterable_field_name];
+      $form[$alterable_field_name] = $parent_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
     }
@@ -157,7 +158,7 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
       // column information into the $form itself.
       $form['#after_build'][] = 'comment_alter_form_comment_form_alter_after_build';
       $form['#validate'][] = 'comment_alter_form_comment_form_alter_validate';
-      $form['#submit'][] = 'comment_alter_form_comment_form_alter_submit';
+      $form['actions']['submit']['#submit'][] = 'comment_alter_form_comment_form_alter_submit';
     }
   }
 }
@@ -203,10 +204,10 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
  * Validation callback for the altered comment form.
  */
 function comment_alter_form_comment_form_alter_validate($form, FormStateInterface &$form_state) {
-  // @todo Complete the vaidation callback function.
+  // @todo Check the vaidation callback function.
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
   $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
-  $parent_form_display->validateFormValues($parent_entity, $form, $form_state);
+  // $parent_form_display->validateFormValues($parent_entity, $form, $form_state);
 
 }
 
@@ -214,12 +215,20 @@ function comment_alter_form_comment_form_alter_validate($form, FormStateInterfac
  * Submit callback for the altered comment form.
  */
 function comment_alter_form_comment_form_alter_submit($form, FormStateInterface &$form_state) {
-  // @todo Complete the submit callback function.
+  // @todo Check if there was actually some change in the alterable fields
+  // If there weren't any changes then return.
+  $values = $form_state->getValues();
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
   $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
-  $parent_form_display->extractFormValues($parent_entity, $form, $form_state);
+  $parent_form = $form;
+  $parent_form_state = new FormState();
+  $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
+  foreach ($values['comment_alter']['fields'] as $alterable_field) {
+    $parent_form_state->setValue($alterable_field, $values[$alterable_field]);
+  }
+  $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
   $parent_entity->save();
-  drupal_set_message('Parent entity alterable fields updated');
+  drupal_set_message('Succesfully updated the alterable fields of parent entity');
 
 }
 
