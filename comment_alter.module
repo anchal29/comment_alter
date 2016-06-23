@@ -141,11 +141,10 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
       if (empty($parent_form[$alterable_field_name])) {
         continue;
       }
-      $form[$alterable_field_name] = $parent_form[$alterable_field_name];
+      $form['comment_alter_' . $alterable_field_name] = $parent_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
     }
-
     if (!empty($alterable_fields)) {
       $form['comment_alter'] = [
         '#type' => 'value',
@@ -167,7 +166,7 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
  * Custom #after_build callback for comment_form to add comment alterable
  * columns info and values.
  */
-function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface $form_state) {
+function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface &$form_state) {
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
   // This one informs about comment_alterable columns per comment_alterable
   // fields. First-level key is the field name, second-level keys (and values)
@@ -177,27 +176,88 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   // alterable fields.
   $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
-    $field_items = Element::children($form[$alterable_field]['widget']);
+    $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
     // Get the column info from first level if it is available there else get
     // it from the first item. In case it is available at the first level then
     // field_items should be string there.
-    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form[$alterable_field]['widget']['0']);
+    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form['comment_alter_' . $alterable_field]['widget']['0']);
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
     }
     $field_value[$alterable_field] = $parent_entity->$alterable_field->getValue();
     // Store the old/current column value for this alterable field.
-    $form['comment_alter_' . $alterable_field . '_old'] = [
-      '#type' => 'value',
-      '#value' => $field_value[$alterable_field],
-    ];
+    $form_state->setValue('comment_alter_' . $alterable_field . '_old', $field_value[$alterable_field]);
   }
-  $form['alterable_columns'] = [
-    '#type' => 'value',
-    '#value' => $alterable_columns,
-  ];
+  $form_state->setValue('alterable_columns', $alterable_columns);
 
   return $form;
+}
+
+/**
+ * Helper function to clean up field values for comparison.
+ *
+ * Removes 'add_more' and non-alterable columns (like _weight) so we can compare
+ * the old and new field values and find changes.
+ *
+ * @param array $values
+ *   Array whose elements should be cleaned up.
+ * @param string $field_name
+ *   Clean up this field of the array.
+ * @param string $old = ''
+ *   Suffix for old value cleanup.
+ */
+function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $prefix = '') {
+  $column_values = [];
+  // Sort the Multiple valued field via there column _weight and then remove
+  // the weight column from values.
+  if (isset($values['alterable_columns'][$prefix . $field_name . $old]['_weight'])) {
+    usort($values[$prefix . $field_name . $old], "cmp");
+  }
+  foreach ($values[$prefix . $field_name . $old] as $level => $deltas) {
+    // Remove the non-alterable columns from comparison.
+    foreach ($values[$prefix . $field_name . $old][$level] as $column => $value) {
+      // Unset the _weight column from $values as our stored old alterable
+      // column value doesn't contain _weight column.
+      if (!isset($values['alterable_columns'][$field_name][$column]) || $column === '_weight') {
+          unset($values[$prefix . $field_name . $old][$level][$column]);
+          continue;
+      }
+    }
+  }
+  _comment_alter_cleanup_arrays($values[$prefix . $field_name . $old]);
+}
+
+/**
+ * usort comparison function.
+ *
+ * @link http://php.net/manual/en/function.usort.php @endlink
+ */
+function cmp($a, $b) {
+  if ($a['_weight'] == $b['_weight']) {
+      return 0;
+  }
+  return ($a['_weight'] < $b['_weight']) ? -1 : 1;
+}
+
+/**
+ * Helper function to recursively clean up semi-empty arrays.
+ *
+ * Eg. array('foo' => array('bar' => array('baz' => ''))) becomes array().
+ *
+ * @param array $a
+ *   Array whose empty elements should be removed.
+ */
+function _comment_alter_cleanup_arrays(&$a) {
+  if (is_array($a)) {
+    foreach ($a as $key => &$value) {
+      if (is_array($value)) {
+        _comment_alter_cleanup_arrays($value);
+      }
+      if (empty($value)) {
+        unset($a[$key]);
+      }
+    }
+  }
 }
 
 /**
@@ -215,21 +275,33 @@ function comment_alter_form_comment_form_alter_validate($form, FormStateInterfac
  * Submit callback for the altered comment form.
  */
 function comment_alter_form_comment_form_alter_submit($form, FormStateInterface &$form_state) {
-  // @todo Check if there was actually some change in the alterable fields
-  // If there weren't any changes then return.
-  $values = $form_state->getValues();
-  $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
-  $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
-  $parent_form = $form;
-  $parent_form_state = new FormState();
-  $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
-  foreach ($values['comment_alter']['fields'] as $alterable_field) {
-    $parent_form_state->setValue($alterable_field, $values[$alterable_field]);
+  $original_value = $form_state->getValues();
+  $values = $original_value;
+  // Do not try to save anything if there is nothing that was allowed to be
+  // changed from the comment form.
+  if (isset($values['comment_alter'])) {
+    $changed_fields = [];
+    foreach ($values['comment_alter']['fields'] as $field_name) {
+      _comment_alter_cleanup_field_values($values, $field_name);
+      _comment_alter_cleanup_field_values($values, $field_name, '_old', 'comment_alter_');
+      // If field values have changed, add it to the list.
+      if ($values['comment_alter_' . $field_name . '_old'] != $values[$field_name]) {
+        $changed_fields[$field_name] = $field_name;
+      }
+    }
+    if (!empty($changed_fields)) {
+      $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
+      $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
+      $parent_form = [];
+      $parent_form_state = new FormState();
+      $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
+      foreach ($original_value['comment_alter']['fields'] as $alterable_field) {
+        $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
+      }
+      $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
+      $parent_entity->save();
+    }
   }
-  $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
-  $parent_entity->save();
-  drupal_set_message('Succesfully updated the alterable fields of parent entity');
-
 }
 
 
@@ -298,7 +370,7 @@ function comment_alter_entity_extra_field_info() {
       foreach ($comment_fields as $comment_field) {
         foreach ($comment_alterable_fields as $field_name) {
           $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
-          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form'][$field_name] = [
+          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form']['comment_alter_' . $field_name] = [
             'label' => $field->getLabel(),
             'description' => $field->getDescription(),
             'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
