@@ -196,8 +196,8 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
 /**
  * Helper function to clean up field values for comparison.
  *
- * Removes 'add_more' and non-alterable columns (like _weight) so we can compare
- * the old and new field values and find changes.
+ * Removes and non-alterable columns so we can compare the old and new field
+ * values and find changes.
  *
  * @param array $values
  *   Array whose elements should be cleaned up.
@@ -205,6 +205,8 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
  *   Clean up this field of the array.
  * @param string $old = ''
  *   Suffix for old value cleanup.
+  * @param string $prefix = ''
+ *   Prefix for old value cleanup.
  */
 function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $prefix = '') {
   $column_values = [];
