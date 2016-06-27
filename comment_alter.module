@@ -189,7 +189,6 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
     $form_state->setValue('comment_alter_' . $alterable_field . '_old', $field_value[$alterable_field]);
   }
   $form_state->setValue('alterable_columns', $alterable_columns);
-
   return $form;
 }
 
@@ -203,17 +202,16 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
  *   Array whose elements should be cleaned up.
  * @param string $field_name
  *   Clean up this field of the array.
- * @param string $old = ''
- *   Suffix for old value cleanup.
-  * @param string $prefix = ''
- *   Prefix for old value cleanup.
+ * @param string $old
+ *   (optional) Suffix for old value cleanup.
+ * @param string $prefix
+ *   (optional) Prefix for old value cleanup.
  */
 function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $prefix = '') {
-  $column_values = [];
   // Sort the Multiple valued field via there column _weight and then remove
   // the weight column from values.
   if (isset($values['alterable_columns'][$prefix . $field_name . $old]['_weight'])) {
-    usort($values[$prefix . $field_name . $old], "cmp");
+    usort($values[$prefix . $field_name . $old], 'comment_alter_cmp');
   }
   foreach ($values[$prefix . $field_name . $old] as $level => $deltas) {
     // Remove the non-alterable columns from comparison.
@@ -234,7 +232,7 @@ function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $
  *
  * @link http://php.net/manual/en/function.usort.php @endlink
  */
-function cmp($a, $b) {
+function comment_alter_cmp($a, $b) {
   if ($a['_weight'] == $b['_weight']) {
       return 0;
   }
@@ -266,10 +264,16 @@ function _comment_alter_cleanup_arrays(&$a) {
  * Validation callback for the altered comment form.
  */
 function comment_alter_form_comment_form_alter_validate($form, FormStateInterface &$form_state) {
-  // @todo Check the vaidation callback function.
+  $original_value = $form_state->getValues();
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
   $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
-  // $parent_form_display->validateFormValues($parent_entity, $form, $form_state);
+  $parent_form = [];
+  $parent_form_state = new FormState();
+  $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
+  foreach ($original_value['comment_alter']['fields'] as $alterable_field) {
+    $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
+  }
+  $parent_form_display->validateFormValues($parent_entity, $parent_form, $parent_form_state);
 
 }
 
@@ -292,8 +296,13 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
       }
     }
     if (!empty($changed_fields)) {
+      // Creating parent entity display form again rather than storing in cache
+      // or something as it would take a lot of resources and cache invalidation
+      // is another issue.
       $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
       $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
+      // Build parent entity display form again and copy the values of
+      // altrable fields from altered comment form into it, then save the form.
       $parent_form = [];
       $parent_form_state = new FormState();
       $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
@@ -301,7 +310,17 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
         $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
       }
       $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
+      // Create new revision of the parent entity and save it.
+      $parent_entity->setNewRevision(TRUE);
       $parent_entity->save();
+      // Store in comment_alter database table the old and new revision IDs
+      // of the parent entity along with comment ID.
+      $comment_alter = [
+        'old_vid' => $values['comment_alter']['old_vid'],
+        'new_vid' => $parent_entity->getRevisionId(),
+        'cid' => $original_value['cid'],
+      ];
+      db_insert('comment_alter')->fields($comment_alter)->execute();
     }
   }
 }
