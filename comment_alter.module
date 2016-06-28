@@ -301,8 +301,8 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
       // is another issue.
       $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
       $parent_form_display = entity_get_form_display($parent_entity->getEntityTypeId(), $parent_entity->bundle(), 'default');
-      // Build parent entity display form again and copy the values of
-      // altrable fields from altered comment form into it, then save the form.
+      // Build parent entity form display again and copy the values of
+      // alterable fields from altered comment form into it, then save the form.
       $parent_form = [];
       $parent_form_state = new FormState();
       $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
@@ -312,6 +312,10 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
       $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
       // Create new revision of the parent entity and save it.
       $parent_entity->setNewRevision(TRUE);
+      if ($parent_entity instanceof \Drupal\node\NodeInterface) {
+        $parent_entity->setRevisionCreationTime(REQUEST_TIME);
+        $parent_entity->setRevisionAuthorId($user->uid);
+      }
       $parent_entity->save();
       // Store in comment_alter database table the old and new revision IDs
       // of the parent entity along with comment ID.
