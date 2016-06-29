@@ -135,16 +135,16 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
     // $form, so that we know we are only getting the field element itself and
     // no other side-effects.
     $parent_form = $form;
-    $parent_form_state = new FormState();
-    $parent_form_display->buildForm($parent_entity, $parent_form, $parent_form_state);
+    $parent_form_display->buildForm($parent_entity, $parent_form, $form_state);
     foreach ($comment_alterable_fields as $alterable_field_name) {
       if (empty($parent_form[$alterable_field_name])) {
         continue;
       }
-      $form['comment_alter_' . $alterable_field_name] = $parent_form[$alterable_field_name];
+      $form[$alterable_field_name] = $parent_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
     }
+
     if (!empty($alterable_fields)) {
       $form['comment_alter'] = [
         '#type' => 'value',
@@ -176,11 +176,11 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   // alterable fields.
   $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
-    $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
+    $field_items = Element::children($form[$alterable_field]['widget']);
     // Get the column info from first level if it is available there else get
     // it from the first item. In case it is available at the first level then
     // field_items should be string there.
-    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form['comment_alter_' . $alterable_field]['widget']['0']);
+    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form[$alterable_field]['widget']['0']);
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
     }
@@ -310,11 +310,12 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
         $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
       }
       $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
-      // Create new revision of the parent entity and save it.
+      // @todo Create new revision of the parent entity and save it, if it is
+      // supported or else just save the entity.
       $parent_entity->setNewRevision(TRUE);
       if ($parent_entity instanceof \Drupal\node\NodeInterface) {
         $parent_entity->setRevisionCreationTime(REQUEST_TIME);
-        $parent_entity->setRevisionAuthorId($user->uid);
+        $parent_entity->setRevisionAuthorId(\Drupal::currentUser()->id());
       }
       $parent_entity->save();
       // Store in comment_alter database table the old and new revision IDs
@@ -395,7 +396,7 @@ function comment_alter_entity_extra_field_info() {
       foreach ($comment_fields as $comment_field) {
         foreach ($comment_alterable_fields as $field_name) {
           $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
-          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form']['comment_alter_' . $field_name] = [
+          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form'][$field_name] = [
             'label' => $field->getLabel(),
             'description' => $field->getDescription(),
             'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
