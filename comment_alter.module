@@ -177,6 +177,11 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
     $field_items = Element::children($form[$alterable_field]['widget']);
+    // If there is no column info available like in case of select list bail
+    // out early or Element::children() will produce an error.
+    if (is_null($field_items['0'])) {
+      continue;
+    }
     // Get the column info from first level if it is available there else get
     // it from the first item. In case it is available at the first level then
     // field_items should be string there.
@@ -189,6 +194,7 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
     $form_state->setValue('comment_alter_' . $alterable_field . '_old', $field_value[$alterable_field]);
   }
   $form_state->setValue('alterable_columns', $alterable_columns);
+
   return $form;
 }
 
@@ -218,7 +224,7 @@ function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $
     foreach ($values[$prefix . $field_name . $old][$level] as $column => $value) {
       // Unset the _weight column from $values as our stored old alterable
       // column value doesn't contain _weight column.
-      if (!isset($values['alterable_columns'][$field_name][$column]) || $column === '_weight') {
+      if (!isset($values['alterable_columns'][$prefix . $field_name . $old][$column]) || $column === '_weight') {
           unset($values[$prefix . $field_name . $old][$level][$column]);
           continue;
       }
@@ -274,7 +280,6 @@ function comment_alter_form_comment_form_alter_validate($form, FormStateInterfac
     $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
   }
   $parent_form_display->validateFormValues($parent_entity, $parent_form, $parent_form_state);
-
 }
 
 /**
@@ -310,8 +315,12 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
         $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
       }
       $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
-      // @todo Create new revision of the parent entity and save it, if it is
+      // Create new revision of the parent entity and save it, if it is
       // supported or else just save the entity.
+      if (!$parent_entity->getEntityType()->hasKey('revision')) {
+        $parent_entity->save();
+        return;
+      }
       $parent_entity->setNewRevision(TRUE);
       if ($parent_entity instanceof \Drupal\node\NodeInterface) {
         $parent_entity->setRevisionCreationTime(REQUEST_TIME);
@@ -330,6 +339,20 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
   }
 }
 
+/**
+ * Implements hook_comment_load().
+ */
+function comment_alter_comment_load($comments) {
+  $result = \Drupal::database()->select('comment_alter', 'c')
+    ->fields('c', array('cid', 'old_vid', 'new_vid'))
+    ->condition('cid', array_keys($comments), 'IN')
+    ->execute();
+  foreach ($result as $row) {
+    $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
+    $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
+  }
+  kint($comments);
+}
 
 /**
  * Implements hook_form_alter().
