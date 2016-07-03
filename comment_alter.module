@@ -172,13 +172,21 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   // fields. First-level key is the field name, second-level keys (and values)
   // are the columns which do have their form elements.
   $alterable_columns = [];
-  // It stores the old/current column value for all the comment
-  // alterable fields.
-  $field_value = [];
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
+    // Store the old/current column value for this alterable field.
+    $form_state->setValue('comment_alter_' . $alterable_field . '_old', $parent_entity->$alterable_field->getValue());
+    // Store the column information also.
     $field_items = Element::children($form[$alterable_field]['widget']);
+    // For select list/checkboxes we have #key_column which stores the column
+    // information of the field so, get it from there and continue.
+    $column = $form[$alterable_field]['widget']['#key_column'];
+    if (isset($column)) {
+      $alterable_columns[$alterable_field][$column] = $column;
+      $form_state->setValue('alterable_columns', $alterable_columns);
+      continue;
+    }
     // If there is no column info available like in case of select list bail
-    // out early or Element::children() will produce an error.
+    // out early or Element::children() will produce an fatal error.
     if (is_null($field_items['0'])) {
       continue;
     }
@@ -189,9 +197,6 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
     }
-    $field_value[$alterable_field] = $parent_entity->$alterable_field->getValue();
-    // Store the old/current column value for this alterable field.
-    $form_state->setValue('comment_alter_' . $alterable_field . '_old', $field_value[$alterable_field]);
   }
   $form_state->setValue('alterable_columns', $alterable_columns);
 
@@ -224,7 +229,7 @@ function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '', $
     foreach ($values[$prefix . $field_name . $old][$level] as $column => $value) {
       // Unset the _weight column from $values as our stored old alterable
       // column value doesn't contain _weight column.
-      if (!isset($values['alterable_columns'][$prefix . $field_name . $old][$column]) || $column === '_weight') {
+      if (!isset($values['alterable_columns'][$field_name][$column]) || $column === '_weight') {
           unset($values[$prefix . $field_name . $old][$level][$column]);
           continue;
       }
@@ -315,16 +320,18 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
         $parent_form_state->setValue($alterable_field, $original_value[$alterable_field]);
       }
       $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
-      // Create new revision of the parent entity and save it, if it is
-      // supported or else just save the entity.
+      // If the parent entity does not support revisions, just save the changes
+      // and return. For revisionable parent entities, create a new revision
+      // with the appropriate user and date, then save both the old and new
+      // revisions' ID for displaying the changes.
       if (!$parent_entity->getEntityType()->hasKey('revision')) {
         $parent_entity->save();
         return;
       }
       $parent_entity->setNewRevision(TRUE);
-      if ($parent_entity instanceof \Drupal\node\NodeInterface) {
+      if ($parent_entity instanceof \Drupal\Core\Entity\RevisionLogInterface) {
         $parent_entity->setRevisionCreationTime(REQUEST_TIME);
-        $parent_entity->setRevisionAuthorId(\Drupal::currentUser()->id());
+        $parent_entity->setRevisionUserId(\Drupal::currentUser()->id());
       }
       $parent_entity->save();
       // Store in comment_alter database table the old and new revision IDs
@@ -351,7 +358,6 @@ function comment_alter_comment_load($comments) {
     $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
     $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
   }
-  kint($comments);
 }
 
 /**
