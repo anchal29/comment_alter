@@ -96,6 +96,9 @@ function comment_alter_get_alterable_fields($entity_type, $bundle) {
           $comment_alter_fields[$entity_type][$bundle][$field_name] = $field_name;
         }
       }
+      if (!isset($comment_alter_fields[$entity_type][$bundle])) {
+        $comment_alter_fields[$entity_type][$bundle] = [];
+      }
       \Drupal::cache()->set($cid, $comment_alter_fields[$entity_type][$bundle]);
     }
   }
@@ -118,7 +121,9 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
   }
   else {
     $parent_entity = $comment_entity->getCommentedEntity();
-    $comment_alterable_fields = comment_alter_get_alterable_fields($parent_entity->getEntityTypeId(), $parent_entity->bundle());
+    $entity_type = $parent_entity->getEntityTypeId();
+    $bundle = $parent_entity->bundle();
+    $comment_alterable_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
     if (empty($comment_alterable_fields)) {
       return;
     }
@@ -145,7 +150,7 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
       if (empty($parent_form[$alterable_field_name])) {
         continue;
       }
-      $form['comment_alter_' . $alterable_field_name] = $parent_form[$alterable_field_name];
+      $form[$entity_type . '_' . $bundle . '_' . 'comment_alter_' . $alterable_field_name] = $parent_form[$alterable_field_name];
       // Remember that this field is alterable.
       $alterable_fields[$alterable_field_name] = $alterable_field_name;
     }
@@ -172,6 +177,8 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
  */
 function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInterface &$form_state) {
   $parent_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
+  $entity_type = $parent_entity->getEntityTypeId();
+  $bundle = $parent_entity->bundle();
   // This one informs about comment_alterable columns per comment_alterable
   // fields. First-level key is the field name, second-level keys (and values)
   // are the columns which do have their form elements.
@@ -179,14 +186,13 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
   foreach ($form['comment_alter']['#value']['fields'] as $alterable_field) {
     // Store the old/current column value for this alterable field.
     $form_state->setValue(['alterable_fields', 'comment_alter_' . $alterable_field . '_old'], $parent_entity->$alterable_field->getValue());
+    $field_widget = $form[$entity_type . '_' . $bundle . '_' . 'comment_alter_' . $alterable_field]['widget'];
     // Store the column information also.
-    $field_items = Element::children($form['comment_alter_' . $alterable_field]['widget']);
+    $field_items = Element::children($field_widget);
     // For select list/checkboxes we have #key_column which stores the column
     // information of the field so, get it from there and continue.
-    $column = $form[$alterable_field]['widget']['#key_column'];
-    if (isset($column)) {
-      $alterable_columns[$alterable_field][$column] = $column;
-      $form_state->setValue('alterable_columns', $alterable_columns);
+    if (isset($field_widget['#key_column'])) {
+      $alterable_columns[$alterable_field][$field_widget['#key_column']] = $field_widget['#key_column'];
       continue;
     }
     // If there is no column info available like in case of select list bail
@@ -197,7 +203,7 @@ function comment_alter_form_comment_form_alter_after_build(&$form, FormStateInte
     // Get the column info from first level if it is available there else get
     // it from the first item. In case it is available at the first level then
     // field_items should be string there.
-    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($form['comment_alter_' . $alterable_field]['widget']['0']);
+    $columns = (is_string($field_items['0'])) ? $field_items : Element::children($field_widget['0']);
     foreach ($columns as $column) {
       $alterable_columns[$alterable_field][$column] = $column;
     }
@@ -430,8 +436,8 @@ function comment_alter_entity_extra_field_info() {
       foreach ($comment_fields as $comment_field) {
         foreach ($comment_alterable_fields as $field_name) {
           $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
-          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form']['comment_alter_' . $field_name] = [
-            'label' => 'comment_alter_' . $field->getLabel(),
+          $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form'][$entity_type . '_' . $bundle . '_' . 'comment_alter_' . $field_name] = [
+            'label' => 'Comment alter: ' . $entity_type . ' . ' . $bundle . ': ' . $field->getLabel(),
             'description' => $field->getDescription(),
             'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
           ];
