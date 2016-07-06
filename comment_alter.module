@@ -372,6 +372,37 @@ function comment_alter_comment_load($comments) {
 }
 
 /**
+ * Returns the differences committed with a particular comment.
+ *
+ * Uses the 'Diff' module to actually generate the differences.
+ *
+ * @param object $comment
+ *   The comment object.
+ *
+ * @return array
+ *   An associative array with keys being the changed field names and values
+ *   being lists of associative arrays with 3 keys:
+ *   - name: field's name being changed (only for the first field value).
+ *   - old: array of old field values.
+ *   - new: array of new field values.
+ */
+function comment_alter_get_changed_fields($comment) {
+  $changed_fields = [];
+
+  if (isset($comment->comment_alter) && isset($comment->comment_alter['new_vid'])) {
+    $parent_entity = $comment->getCommentedEntity();
+    $entity_type = $parent_entity->getEntityTypeId();
+    $bundle = $parent_entity->bundle();
+    $entity_storage = \Drupal::entityTypeManager()->getStorage($entity_type);
+    $old_entity = entity_revision_load($entity_type, $comment->comment_alter['old_vid']);
+    $new_entity = entity_revision_load($entity_type, $comment->comment_alter['new_vid']);
+
+    $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
+  }
+  return $changed_fields;
+}
+
+/**
  * Implements hook_form_alter().
  */
 function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_id) {
