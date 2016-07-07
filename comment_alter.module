@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Form\FormState;
+use Drupal\comment\CommentInterface;
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -16,12 +17,6 @@ use Drupal\Core\Form\FormState;
 function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterface $form_state) {
   $field = $form_state->getFormObject()->getEntity();
 
-  // To ensure that comment alter fields of parent entity is not present in the
-  // comment form. This case only arise if parent entity is comment itself so,
-  // removing that option.
-  if ($field->getTargetEntityTypeId() == 'comment') {
-    return;
-  }
   $form['third_party_settings']['comment_alter']['comment_alter_enabled'] = [
     '#type' => 'checkbox',
     '#title' => t('User may alter this field from comment.'),
@@ -376,7 +371,7 @@ function comment_alter_comment_load($comments) {
  *
  * Uses the 'Diff' module to actually generate the differences.
  *
- * @param object $comment
+ * @param \Drupal\comment\CommentInterface $comment
  *   The comment object.
  *
  * @return array
@@ -386,7 +381,7 @@ function comment_alter_comment_load($comments) {
  *   - old: array of old field values.
  *   - new: array of new field values.
  */
-function comment_alter_get_changed_fields($comment) {
+function comment_alter_get_changed_fields(CommentInterface $comment) {
   $changed_fields = [];
 
   if (isset($comment->comment_alter) && isset($comment->comment_alter['new_vid'])) {
@@ -394,10 +389,11 @@ function comment_alter_get_changed_fields($comment) {
     $entity_type = $parent_entity->getEntityTypeId();
     $bundle = $parent_entity->bundle();
     $entity_storage = \Drupal::entityTypeManager()->getStorage($entity_type);
-    $old_entity = entity_revision_load($entity_type, $comment->comment_alter['old_vid']);
-    $new_entity = entity_revision_load($entity_type, $comment->comment_alter['new_vid']);
-
+    $old_entity = $entity_storage->loadRevision($comment->comment_alter['old_vid']);
+    $new_entity = $entity_storage->loadRevision($comment->comment_alter['new_vid']);
     $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
+    // @todo Use Diff to find out the difference between new and old entity for
+    // all the alterable fields only.
   }
   return $changed_fields;
 }
@@ -468,7 +464,7 @@ function comment_alter_entity_extra_field_info() {
         foreach ($comment_alterable_fields as $field_name) {
           $field = FieldConfig::loadByName($entity_type, $bundle, $field_name);
           $extra['comment'][$comment_bundles[$entity_type][$comment_field]]['form'][$entity_type . '_' . $bundle . '_' . 'comment_alter_' . $field_name] = [
-            'label' => 'Comment alter: ' . $entity_type . ' . ' . $bundle . ': ' . $field->getLabel(),
+            'label' => t('Comment alter: %type . %bundle : %label', ['%type' => $entity_type, '%bundle' => $bundle, '%label' => $field->getLabel()]),
             'description' => $field->getDescription(),
             'weight' => $weight[$comment_bundles[$entity_type][$comment_field]],
           ];
