@@ -10,6 +10,8 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Form\FormState;
 use Drupal\comment\CommentInterface;
+use Drupal\diff\EntityComparisonBase;
+use Drupal\Component\Diff\Diff;
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -364,6 +366,10 @@ function comment_alter_comment_load($comments) {
     $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
     $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
   }
+  // @todo Remove it. Just for testing purpose.
+  foreach ($comments as $comment) {
+    kint(comment_alter_get_changed_fields($comment));
+  }
 }
 
 /**
@@ -392,10 +398,74 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
     $old_entity = $entity_storage->loadRevision($comment->comment_alter['old_vid']);
     $new_entity = $entity_storage->loadRevision($comment->comment_alter['new_vid']);
     $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
-    // @todo Use Diff to find out the difference between new and old entity for
-    // all the alterable fields only.
+
+    // Use diff modules function to generate the row wise differences in the
+    // two revisions.
+    $container = \Drupal::getContainer();
+    $entity_comparison = EntityComparisonBase::create($container);
+    $fields = $entity_comparison->compareRevisions($old_entity, $new_entity);
+    // Build the diff rows for each field and append the field rows
+    // to the changed field array as new and old values.
+    $diff_rows = [];
+    $filter = 'raw';
+    foreach ($fields as $field_name => $field) {
+      if (isset($comment_alter_fields[$field_name]) && !empty($field['#name'])) {
+        $field_diff_rows = comment_alter_get_rows_diff(
+          $field['#states'][$filter]['#left'],
+          $field['#states'][$filter]['#right']
+        );
+        foreach ($field_diff_rows as $row) {
+          $changed_fields[$field_name][] = [
+            'old' => [empty($row[1]['data']) ? '' : $row[1]['data']],
+            'new' => [empty($row[3]['data']) ? '' : $row[3]['data']],
+          ];
+        }
+      }
+    }
   }
+
   return $changed_fields;
+}
+
+/**
+ * Prepare the table rows for theme 'table'.
+ *
+ * @param string $a
+ *   The source string to compare from.
+ * @param string $b
+ *   The target string to compare to.
+ * @param boolean $show_header
+ *   Display diff context headers. For example, "Line x".
+ * @param array $line_stats
+ *   This structure tracks line numbers across multiple calls to DiffFormatter.
+ *
+ * @return array
+ *   Array of rows usable with theme('table').
+ */
+function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats = NULL) {
+  $a = is_array($a) ? $a : explode("\n", $a);
+  $b = is_array($b) ? $b : explode("\n", $b);
+
+  // Temporary workaround: when comparing with an empty string, Diff Component
+  // returns a change OP instead of an add OP.
+  if (count($a) == 1 && $a[0] == "") {
+    $a = [];
+  }
+
+  if (!isset($line_stats)) {
+    $line_stats = [
+      'counter' => ['x' => 0, 'y' => 0],
+      'offset' => ['x' => 0, 'y' => 0],
+    ];
+  }
+
+  // Header is the line counter.
+  $container = \Drupal::getContainer();
+  $diff_formatter = $container->get('diff.diff.formatter');
+  $diff_formatter->show_header = $show_header;
+  $diff = new Diff($a, $b);
+
+  return $diff_formatter->format($diff);
 }
 
 /**
