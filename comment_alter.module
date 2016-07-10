@@ -355,7 +355,7 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
 }
 
 /**
- * Implements hook_comment_load().
+ * Implements hook_ENTITY_TYPE_load().
  */
 function comment_alter_comment_load($comments) {
   $result = \Drupal::database()->select('comment_alter', 'c')
@@ -366,14 +366,10 @@ function comment_alter_comment_load($comments) {
     $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
     $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
   }
-  // @todo Remove it. Just for testing purpose.
-  foreach ($comments as $comment) {
-    kint(comment_alter_get_changed_fields($comment));
-  }
 }
 
 /**
- * Returns the differences committed with a particular comment.
+ * Returns a table showing the differences committed with a particular comment.
  *
  * Uses the 'Diff' module to actually generate the differences.
  *
@@ -416,15 +412,42 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
         );
         foreach ($field_diff_rows as $row) {
           $changed_fields[$field_name][] = [
-            'old' => [empty($row[1]['data']) ? '' : $row[1]['data']],
-            'new' => [empty($row[3]['data']) ? '' : $row[3]['data']],
+            'old' => empty($row[1]['data']) ? '' : $row[1]['data'],
+            'new' => empty($row[3]['data']) ? '' : $row[3]['data'],
           ];
         }
       }
     }
   }
-
-  return $changed_fields;
+  $rows = $table_row = [];
+  foreach ($changed_fields as $field_name => $field) {
+    foreach ($field as $value) {
+      $table_row = [$field_name,];
+      if (is_array($value['old'])) {
+        $table_row[] = implode(', ', $value['old']);
+      }
+      else {
+        $table_row[] = $value['old'];
+      }
+      $table_row[] = '&raquo;';
+      if (is_array($value['new'])) {
+        $table_row[] = implode(', ', $value['new']);
+      }
+      else {
+        $table_row[] = $value['new'];
+      }
+      $rows[] = $table_row;
+    }
+  }
+  if (!empty($rows)) {
+    $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
+    $build['comment_alter'] = [
+      '#type' => 'table',
+      '#rows' => $rows,
+      '#attributes' => ['class' => ['comment-alter-diff']],
+    ];
+    return $build['comment_alter'];
+  }
 }
 
 /**
@@ -451,7 +474,6 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
   if (count($a) == 1 && $a[0] == "") {
     $a = [];
   }
-
   if (!isset($line_stats)) {
     $line_stats = [
       'counter' => ['x' => 0, 'y' => 0],
@@ -466,6 +488,15 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
   $diff = new Diff($a, $b);
 
   return $diff_formatter->format($diff);
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_view().
+ */
+function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode) {
+  if ($view_mode == 'full') {
+    $build['comment_alter'] = comment_alter_get_changed_fields($comment);
+  }
 }
 
 /**
