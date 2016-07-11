@@ -1,5 +1,4 @@
 comment_alter.diff:
-  version: 1.x
   css:
     theme:
       css/comment_alter.diff.css: {}

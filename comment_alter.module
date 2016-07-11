@@ -377,11 +377,7 @@ function comment_alter_comment_load($comments) {
  *   The comment object.
  *
  * @return array
- *   An associative array with keys being the changed field names and values
- *   being lists of associative arrays with 3 keys:
- *   - name: field's name being changed (only for the first field value).
- *   - old: array of old field values.
- *   - new: array of new field values.
+ *   Table showing the differences made by the comment on the parent entity.
  */
 function comment_alter_get_changed_fields(CommentInterface $comment) {
   $changed_fields = [];
@@ -395,8 +391,8 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
     $new_entity = $entity_storage->loadRevision($comment->comment_alter['new_vid']);
     $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
 
-    // Use diff modules function to generate the row wise differences in the
-    // two revisions.
+    // Use diff module's function to generate the row-wise differences between
+    // the two revisions.
     $container = \Drupal::getContainer();
     $entity_comparison = EntityComparisonBase::create($container);
     $fields = $entity_comparison->compareRevisions($old_entity, $new_entity);
@@ -410,43 +406,26 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
           $field['#states'][$filter]['#left'],
           $field['#states'][$filter]['#right']
         );
+        $line = 0;
         foreach ($field_diff_rows as $row) {
-          $changed_fields[$field_name][] = [
-            'old' => empty($row[1]['data']) ? '' : $row[1]['data'],
-            'new' => empty($row[3]['data']) ? '' : $row[3]['data'],
+          $changed_fields[] = [
+            'name' => $line ? '' : ['data' => ['#markup' => '<b>' . $field['#name'] . '</b>']],
+            'old' => ['data' => empty($row[1]['data']) ? '' : $row[1]['data']],
+            'arrow' => ['data' => ['#markup' => '&Rightarrow;']],
+            'new' => ['data' => empty($row[3]['data']) ? '' : $row[3]['data']],
           ];
+          $line++;
         }
       }
     }
   }
-  $rows = $table_row = [];
-  foreach ($changed_fields as $field_name => $field) {
-    foreach ($field as $value) {
-      $table_row = [$field_name,];
-      if (is_array($value['old'])) {
-        $table_row[] = implode(', ', $value['old']);
-      }
-      else {
-        $table_row[] = $value['old'];
-      }
-      $table_row[] = '&raquo;';
-      if (is_array($value['new'])) {
-        $table_row[] = implode(', ', $value['new']);
-      }
-      else {
-        $table_row[] = $value['new'];
-      }
-      $rows[] = $table_row;
-    }
-  }
-  if (!empty($rows)) {
-    $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
-    $build['comment_alter'] = [
+
+  if (!empty($changed_fields)) {
+    return [
       '#type' => 'table',
-      '#rows' => $rows,
+      '#rows' => $changed_fields,
       '#attributes' => ['class' => ['comment-alter-diff']],
     ];
-    return $build['comment_alter'];
   }
 }
 
@@ -495,6 +474,7 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
  */
 function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode) {
   if ($view_mode == 'full') {
+    $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
     $build['comment_alter'] = comment_alter_get_changed_fields($comment);
   }
 }
