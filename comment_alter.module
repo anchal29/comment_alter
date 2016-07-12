@@ -480,6 +480,15 @@ function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\C
 }
 
 /**
+ * Implements hook_ENTITY_TYPE_delete().
+ */
+function comment_alter_comment_delete(EntityInterface $comment) {
+  db_delete('comment_alter')
+    ->condition('cid', $comment->id())
+    ->execute();
+}
+
+/**
  * Implements hook_form_alter().
  */
 function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_id) {
