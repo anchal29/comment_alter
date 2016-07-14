@@ -390,6 +390,9 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
     $entity_storage = \Drupal::entityTypeManager()->getStorage($entity_type);
     $old_entity = $entity_storage->loadRevision($comment->comment_alter['old_vid']);
     $new_entity = $entity_storage->loadRevision($comment->comment_alter['new_vid']);
+    if (empty($old_entity) || empty($new_entity)) {
+      return;
+    }
     $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
 
     // Use diff module's function to generate the row-wise differences between
