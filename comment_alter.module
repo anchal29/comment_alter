@@ -349,6 +349,7 @@ function comment_alter_form_comment_form_alter_submit($form, FormStateInterface 
         'old_vid' => $values['comment_alter']['old_vid'],
         'new_vid' => $parent_entity->getRevisionId(),
         'cid' => $original_value['cid'],
+        'parent_entity_type' => $parent_entity->getEntityTypeId(),
       ];
       db_insert('comment_alter')->fields($comment_alter)->execute();
     }
@@ -390,9 +391,6 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
     $entity_storage = \Drupal::entityTypeManager()->getStorage($entity_type);
     $old_entity = $entity_storage->loadRevision($comment->comment_alter['old_vid']);
     $new_entity = $entity_storage->loadRevision($comment->comment_alter['new_vid']);
-    if (empty($old_entity) || empty($new_entity)) {
-      return;
-    }
     $comment_alter_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
 
     // Use diff module's function to generate the row-wise differences between
@@ -487,11 +485,29 @@ function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\C
  * Implements hook_ENTITY_TYPE_delete().
  */
 function comment_alter_comment_delete(EntityInterface $comment) {
-  db_delete('comment_alter')
+  \Drupal::database()->delete('comment_alter')
     ->condition('cid', $comment->id())
     ->execute();
 }
 
+/**
+ * Implements hook_entity_revision_delete().
+ */
+function comment_alter_entity_revision_delete(EntityInterface $entity) {
+  // Delete entries from the comment_alter table when a parent entity revision
+  // is deleted.
+  $conditions = new \Drupal\Core\Database\Query\Condition('OR');
+  if ($entity->getEntityType()->hasKey('revision')) {
+    \Drupal::database()->delete('comment_alter')
+      ->condition('parent_entity_type', $entity->getEntityTypeId())
+      ->condition($conditions
+        ->condition('old_vid', $entity->getRevisionId())
+        ->condition('new_vid', $entity->getRevisionId())
+      )
+      ->execute();
+  }
+
+}
 /**
  * Implements hook_form_alter().
  */

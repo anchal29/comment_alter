@@ -5,6 +5,8 @@
  * Install and uninstall functions for the Comment Alter module.
  */
 
+use Drupal\Core\Entity\EntityTypeInterface;
+
 /**
  * Implements hook_schema().
  */
@@ -18,6 +20,13 @@ function comment_alter_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
+      ],
+      'parent_entity_type' => [
+        'description' => 'Entity type of the parent entity.',
+        'type' => 'varchar_ascii',
+        'length' => EntityTypeInterface::ID_MAX_LENGTH,
+        'not null' => TRUE,
+        'default' => 'node',
       ],
       'old_vid' => [
         'description' => 'The old entity revision ID this change refers to.',
@@ -35,6 +44,7 @@ function comment_alter_schema() {
       ],
     ],
     'indexes' => [
+      'parent_entity_type' => ['parent_entity_type'],
       'new_vid' => ['new_vid'],
       'old_vid' => ['old_vid'],
     ],
