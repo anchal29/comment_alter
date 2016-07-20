@@ -111,6 +111,49 @@ class CommentAlterTestBase extends BrowserTestBase {
   }
 
   /**
+   * Creates an entity object with the provided values.
+   *
+   * @param array $values
+   *   (optional) An array of values to set, keyed by property name.
+   */
+  protected function createEntityObject($values = []) {
+    // Create a test entity object for the entity_test_bundle.
+    $random_label = $this->randomMachineName();
+    $data = ['type' => 'entity_test_bundle', 'name' => $random_label] + $values;
+    $this->entity = EntityTest::create($data);
+    $this->entity->save();
+  }
+
+  /**
+   * Asserts that comment alterable field is present on the comment form.
+   *
+   * @param string $field_name
+   *   Field added to the entity_test_bundle.
+   * @param boolean $enabled_alterable_field
+   *   Boolean indicating whether comment alter option is enabled for the field.
+   */
+  protected function assertAlterableField($field_name, $enabled_alterable_field) {
+    $this->drupalGet('comment/reply/entity_test/' . $entity->id() . '/comment');
+    $this->assertEqual(entity_get_form_display('comment', 'comment', 'default')->getComponent($field_name), $enabled_alterable_field);
+  }
+
+  /**
+   * Posts a comment using the psuedo browser.
+   *
+   * @param array $comment_edit
+   *   (optional) An array that gets added to the $edit array passed to
+   *   $this->drupalPostForm().
+   */
+  protected function postComment($comment_edit = []) {
+    // Populate the subject and body fields.
+    $edit['comment_body[0][value]'] = $this->randomName();
+    $edit['subject[0][value]'] = $subject;
+    $edit = array_merge($edit, $comment_edit);
+    $this->drupalGet('comment/reply/entity_test/' . $entity->id() . '/comment');
+    $this->drupalPostForm(NULL, $edit, t('Save'));
+  }
+
+  /**
    * Just for testing purpose.
    * @todo Instead of this add other functions here.
    */
@@ -118,8 +161,10 @@ class CommentAlterTestBase extends BrowserTestBase {
     $fieldName = $this->addField('text', 'text_textfield');
     $field_storage = FieldStorageConfig::loadByName('entity_test', $fieldName);
     $field = FieldConfig::loadByName('entity_test', 'entity_test_bundle', $fieldName);
+    $this->createEntityObject();
+    $this->assertAlterableField($fieldName, TRUE);
+    $this->postComment();
     $this->assertTrue($field_storage, 'Our added field storage exists.');
-    $this->assertEqual('1', '1');
   }
 
 }
