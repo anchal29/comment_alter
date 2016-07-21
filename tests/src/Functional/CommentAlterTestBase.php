@@ -133,7 +133,6 @@ class CommentAlterTestBase extends BrowserTestBase {
    *   Boolean indicating whether comment alter option is enabled for the field.
    */
   protected function assertAlterableField($field_name, $enabled_alterable_field) {
-    $this->drupalGet('comment/reply/entity_test/' . $entity->id() . '/comment');
     $this->assertEqual(entity_get_form_display('comment', 'comment', 'default')->getComponent($field_name), $enabled_alterable_field);
   }
 
@@ -146,25 +145,11 @@ class CommentAlterTestBase extends BrowserTestBase {
    */
   protected function postComment($comment_edit = []) {
     // Populate the subject and body fields.
-    $edit['comment_body[0][value]'] = $this->randomName();
-    $edit['subject[0][value]'] = $subject;
+    $edit['comment_body[0][value]'] = $this->randomMachineName(20);
+    $edit['subject[0][value]'] = $this->randomMachineName(5);
     $edit = array_merge($edit, $comment_edit);
-    $this->drupalGet('comment/reply/entity_test/' . $entity->id() . '/comment');
+    $this->drupalGet('comment/reply/entity_test/' . $this->entity->id() . '/comment');
     $this->drupalPostForm(NULL, $edit, t('Save'));
-  }
-
-  /**
-   * Just for testing purpose.
-   * @todo Instead of this add other functions here.
-   */
-  public function testChecking() {
-    $fieldName = $this->addField('text', 'text_textfield');
-    $field_storage = FieldStorageConfig::loadByName('entity_test', $fieldName);
-    $field = FieldConfig::loadByName('entity_test', 'entity_test_bundle', $fieldName);
-    $this->createEntityObject();
-    $this->assertAlterableField($fieldName, TRUE);
-    $this->postComment();
-    $this->assertTrue($field_storage, 'Our added field storage exists.');
   }
 
 }
