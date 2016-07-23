@@ -4,6 +4,8 @@ namespace Drupal\Tests\comment_alter\Functional;
 
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\comment_alter\Functional\CommentAlterTestBase;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\Core\Form\FormState;
 
 /**
  * Tests the comment alter module functions for text fields.
@@ -24,25 +26,13 @@ class CommentAlterTextTest extends CommentAlterTestBase {
     $field_name = $this->addField('text', 'text_textfield', [
       'cardinality' => 1,
     ], TRUE);
+    // Invalidate cache after selecting comment_alter option for our field.
+    \Drupal::cache()->delete('comment_alter_fields:' . $this->entityType . ':' . $this->bundle);
+    $old_value = $this->randomMachineName(5);
+    $new_value = $this->randomMachineName(6);
 
-    $old_value = $this->randomMachineName();
-    $new_value = $this->randomMachineName();
-    $this->assertNotEqual($old_value, $new_value);
-
-    $this->createEntityObject([$field_name => ['value' => 'foo']]);
-    // @todo Remove the following unwanted lines. It is just for debugging.
-    $this->content = $this->drupalGet('entity_test/structure/entity_test_bundle/form-display');
-    file_put_contents('/home/anchal/debug/entity_page.html', $this->content);
-    $this->content = $this->drupalGet('entity_test/structure/entity_test_bundle/fields/entity_test.entity_test_bundle.' . $field_name);
-    file_put_contents('/home/anchal/debug/entity_page1.html', $this->content);
-    $this->content = $this->drupalGet('comment/reply/entity_test/' . $this->entity->id() . '/comment');
-    file_put_contents('/home/anchal/debug/comment_form.html', $this->content);
-    // Till here.
+    $this->createEntityObject([$field_name => ['value' => $old_value]]);
     $this->assertAlterableField($field_name, TRUE);
-    $this->postComment([$field_name => 'bar']);
-    // @todo Remove these lines also.
-    $this->content = $this->drupalGet('entity_test/' . $this->entity->id());
-    file_put_contents('/home/anchal/debug/final_page.html', $this->content);
-
+    $this->postComment([$field_name => $new_value]);
   }
 }

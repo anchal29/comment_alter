@@ -3,7 +3,7 @@
 namespace Drupal\Tests\comment_alter\Functional;
 
 use Drupal\Tests\BrowserTestBase;
-use Drupal\entity_test\Entity\EntityTest;
+use Drupal\entity_test\Entity\EntityTestRev;
 use Drupal\comment\Entity\CommentType;
 use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\field\Entity\FieldConfig;
@@ -24,7 +24,7 @@ class CommentAlterTestBase extends BrowserTestBase {
    *
    * @var array
    */
-  public static $modules = ['comment_alter', 'entity_test', 'comment', 'field_ui', 'field'];
+  public static $modules = ['comment_alter', 'entity_test', 'comment', 'field'];
 
   /**
    * The admin user.
@@ -41,20 +41,36 @@ class CommentAlterTestBase extends BrowserTestBase {
   protected $entity;
 
   /**
+   * The parent entity type id.
+   *
+   * @var string
+   */
+  protected $entityType;
+
+  /**
+   * The parent entity bundle.
+   *
+   * @var string
+   */
+  protected $bundle;
+
+  /**
    * {@inheritoc}
    */
   protected function setUp() {
     parent::setUp();
-    // Create a bundle for entity_test.
-    entity_test_create_bundle('entity_test_bundle', 'Entity Test Bundle');
+    $this->entityType = 'entity_test_rev';
+    // By default this bundle is there.
+    $this->bundle = 'entity_test_rev';
+
     CommentType::create([
       'id' => 'comment',
       'label' => 'Comment',
       'description' => 'Comment type for Comment Alter',
-      'target_entity_type_id' => 'entity_test',
+      'target_entity_type_id' => $this->entityType,
     ])->save();
     // Add a comment field on entity_test_bundle.
-    $this->addDefaultCommentField('entity_test', 'entity_test_bundle');
+    $this->addDefaultCommentField($this->entityType, $this->bundle);
     // Provide necessary permissions to the adminUser.
     $this->adminUser = $this->drupalCreateUser([
       'administer comments',
@@ -64,8 +80,6 @@ class CommentAlterTestBase extends BrowserTestBase {
       'view test entity field',
       'administer entity_test content',
       'access administration pages',
-      'administer entity_test fields',
-      'administer entity_test form display',
     ]);
     $this->drupalLogin($this->adminUser);
 
@@ -92,13 +106,13 @@ class CommentAlterTestBase extends BrowserTestBase {
 
     FieldStorageConfig::create([
       'field_name' => $this->fieldName,
-      'entity_type' => 'entity_test',
+      'entity_type' => $this->entityType,
       'type' => $field_type,
     ] + $field_settings)->save();
     FieldConfig::create([
       'field_name' => $this->fieldName,
-      'entity_type' => 'entity_test',
-      'bundle' => 'entity_test_bundle',
+      'entity_type' => $this->entityType,
+      'bundle' => $this->bundle,
       'widget' => [
         'type' => $widget_type,
       ],
@@ -111,7 +125,7 @@ class CommentAlterTestBase extends BrowserTestBase {
 
     // By default the added field is hidden so enable it and set the widget
     // type.
-    entity_get_form_display('entity_test', 'entity_test_bundle', 'default')
+    entity_get_form_display($this->entityType, $this->bundle, 'default')
       ->setComponent($this->fieldName, [
         'type' => $widget_type,
       ])
@@ -129,15 +143,16 @@ class CommentAlterTestBase extends BrowserTestBase {
   protected function createEntityObject($values = []) {
     // Create a test entity object for the entity_test_bundle.
     $random_label = $this->randomMachineName();
-    $data = ['type' => 'entity_test_bundle', 'name' => $random_label] + $values;
-    $this->entity = EntityTest::create($data);
+    $data = ['type' => $this->bundle, 'name' => $random_label] + $values;
+    $this->entity = EntityTestRev::create($data);
     $this->entity->save();
   }
 
   /**
-   * Asserts that comment alterable field is present on the comment form and
-   * it is reorderable via UI. Checks whether the two options appear on field
-   * edit/add form.
+   * Asserts that alterable field is present on the comment form as expected.
+   *
+   * Checks if the alterable field is re-orderable and is present on the
+   * comment forms.
    *
    * @param string $field_name
    *   Field added to the entity_test_bundle.
@@ -145,37 +160,22 @@ class CommentAlterTestBase extends BrowserTestBase {
    *   Boolean indicating whether comment alter option is enabled for the field.
    */
   protected function assertAlterableField($field_name, $enabled_alterable_field) {
-    // Make sure we get options on any field edit/add form to enable comment
-    // altering.
-    $this->drupalGet('entity_test/structure/entity_test_bundle/fields/entity_test.entity_test_bundle.' . $field_name);
-    $checkbox_name = 'third_party_settings[comment_alter][comment_alter_enabled]';
-    $hide_text = 'Hide alterations of this field from diffs';
     $comment_display_form = entity_get_form_display('comment', 'comment', 'default');
-    $comment_field = 'entity_test_entity_test_bundle_comment_alter_' . $field_name;
+    $comment_field = $this->entityType . '_' . $this->bundle . '_comment_alter_' . $field_name;
+    $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     if ($enabled_alterable_field) {
-      $this->assertSession()->checkboxChecked($checkbox_name);
-      $this->assertSession()->pageTextContains($hide_text);
+      $this->assertSession()->fieldExists($field_name);
       // To make sure that site builder can reorder the fields from the UI.
-      if (!($comment_display_form->getComponent($comment_field))) {
+      if ($comment_display_form->getComponent($comment_field) == NULL) {
         self::assertTrue(FALSE, 'Alterable fields are not present in the comment form display');
       }
     }
     else {
-      $this->assertSession()->checkboxNotChecked($checkbox_name);
-      $this->assertSession()->pageTextNotContains($hide_text);
+      $this->assertSession()->fieldNotExists($field_name);
       // To make sure that site builder can reorder the fields from the UI.
-      if (($comment_display_form->getComponent($comment_field))) {
+      if ($comment_display_form->getComponent($comment_field)) {
         self::assertTrue(FALSE, 'Comment alterable fields are present in the comment form display');
       }
-    }
-
-    // Check if we get the added field on comment form or not.
-    $this->drupalGet('comment/reply/entity_test/' . $this->entity->id() . '/comment');
-    if ($enabled_alterable_field) {
-      $this->assertSession()->fieldExists($field_name);
-    }
-    else {
-      $this->assertSession()->fieldNotExists($field_name);
     }
 
   }
@@ -192,7 +192,7 @@ class CommentAlterTestBase extends BrowserTestBase {
     $edit['comment_body[0][value]'] = $this->randomMachineName(20);
     $edit['subject[0][value]'] = $this->randomMachineName(5);
     $edit = array_merge($edit, $comment_edit);
-    $this->drupalGet('comment/reply/entity_test/' . $this->entity->id() . '/comment');
+    $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     $this->drupalPostForm(NULL, $edit, t('Save'));
   }
 
