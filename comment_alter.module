@@ -403,7 +403,13 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
     $diff_rows = [];
     $filter = 'raw';
     foreach ($fields as $field_name => $field) {
-      if (isset($comment_alter_fields[$field_name]) && !empty($field['#name'])) {
+      // Because of some core changes the format of $field_name changed. For
+      // some entities it became 'EntityType.ActualFieldName' and for the rest
+      // it was still the actual field name. Get the field name from both of
+      // these cases.
+      $field_name_array = explode('.', $field_name);
+      $actual_field_name = $field_name_array[sizeof($field_name_array)-1];
+      if (isset($comment_alter_fields[$actual_field_name]) && !empty($field['#name'])) {
         $field_diff_rows = comment_alter_get_rows_diff(
           $field['#states'][$filter]['#left'],
           $field['#states'][$filter]['#right']
@@ -475,10 +481,9 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
  * Implements hook_ENTITY_TYPE_view().
  */
 function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode) {
-  if ($view_mode == 'full') {
-    $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
-    $build['comment_alter'] = comment_alter_get_changed_fields($comment);
-  }
+  // Show the differences irrespetive of the view modes.
+  $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
+  $build['comment_alter'] = comment_alter_get_changed_fields($comment);
 }
 
 /**
