@@ -481,9 +481,11 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
  * Implements hook_ENTITY_TYPE_view().
  */
 function comment_alter_comment_view(&$build, EntityInterface $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode) {
-  // Show the differences irrespetive of the view modes.
-  $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
-  $build['comment_alter'] = comment_alter_get_changed_fields($comment);
+  // Show the differences irrespective of the view modes.
+  if ($display->getComponent('comment_alter')) {
+    $build['#attached']['library'][] = 'comment_alter/comment_alter.diff';
+    $build['comment_alter'] = comment_alter_get_changed_fields($comment);
+  }
 }
 
 /**

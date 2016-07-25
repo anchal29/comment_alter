@@ -166,18 +166,8 @@ class CommentAlterTestBase extends BrowserTestBase {
     if ($enabled_alterable_field) {
       $this->assertSession()->fieldExists($field_name);
       // To make sure that site builder can reorder the fields from the UI.
-      if ($comment_display_form->getComponent($comment_field) == NULL) {
-        self::assertTrue(FALSE, 'Alterable fields are not present in the comment form display');
-      }
+      self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
     }
-    else {
-      $this->assertSession()->fieldNotExists($field_name);
-      // To make sure that site builder can reorder the fields from the UI.
-      if ($comment_display_form->getComponent($comment_field)) {
-        self::assertTrue(FALSE, 'Comment alterable fields are present in the comment form display');
-      }
-    }
-
   }
 
   /**
@@ -189,11 +179,71 @@ class CommentAlterTestBase extends BrowserTestBase {
    */
   protected function postComment($comment_edit = []) {
     // Populate the subject and body fields.
-    $edit['comment_body[0][value]'] = $this->randomMachineName(20);
-    $edit['subject[0][value]'] = $this->randomMachineName(5);
+    $edit['comment_body[0][value]'] = $this->randomString();
+    $edit['subject[0][value]'] = $this->randomString();
     $edit = array_merge($edit, $comment_edit);
     $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     $this->drupalPostForm(NULL, $edit, t('Save'));
+  }
+
+  /**
+   * Get a comment alteration diffs from the current page.
+   *
+   * @return array
+   *   An associative array keyed by field label pointing to an array which
+   *   contains arrays which have two values, the original and new value for the
+   *   given field.
+   */
+  protected function getCommentAlterations() {
+    // Extract the values from the
+    // '<table class="comment-alter-diff">...</table>'.
+    $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
+    $td_s = $this->xpath('//table[@class=:class]/tbody/tr/td', [':class' => 'comment-alter-diff']);
+    $fields = [];
+    $i = 0;
+    foreach ($td_s as $td) {
+      switch ($i % 4) {
+        case 0:
+          $field_name = $td->getText();
+          $field_name = empty($field_name) ? $last_field_name : $field_name;
+          break;
+
+        case 1:
+          $old_value = $td->getText();
+          break;
+
+        case 3:
+          $new_value = $td->getText();
+          break;
+      }
+      $i++;
+      if (($i % 4) == 0) {
+        $last_field_name = $field_name;
+        $fields[$field_name] = [$old_value, $new_value];
+      }
+    }
+    return $fields;
+  }
+
+  /**
+   * Asserts that a Comment Alter diff table on the current page is as expected.
+   *
+   * @param array $test
+   *   An associative array with keys for the field name referring to arrays
+   *   with exactly two values: the original and new value as human readable
+   *   strings.
+   */
+  protected function assertCommentDiff($test) {
+    $fields = $this->getCommentAlterations();
+
+    // Compare the values passed in against what's on the page.
+    foreach ($test as $field_name => $values) {
+      self::assertTrue(isset($fields[$field_name]), "Comment alterable field not found in comment alter diff");
+      foreach ($values as $value) {
+        self::assertEquals($fields[$field_name][0], $value[0], "Comment alter diff original doesn't match");
+        self::assertEquals($fields[$field_name][1], $value[1], "Comment alter diff changed doesn't match");
+      }
+    }
   }
 
 }
