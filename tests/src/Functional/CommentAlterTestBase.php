@@ -102,15 +102,15 @@ class CommentAlterTestBase extends BrowserTestBase {
    *   The name of the field that was created.
    */
   protected function addField($field_type, $widget_type, $field_settings = array(), $comment_alter = TRUE) {
-    $this->fieldName = Unicode::strtolower($this->randomMachineName() . '_field_name');
+    $field_name = Unicode::strtolower($this->randomMachineName() . '_field_name');
 
     FieldStorageConfig::create([
-      'field_name' => $this->fieldName,
+      'field_name' => $field_name,
       'entity_type' => $this->entityType,
       'type' => $field_type,
     ] + $field_settings)->save();
     FieldConfig::create([
-      'field_name' => $this->fieldName,
+      'field_name' => $field_name,
       'entity_type' => $this->entityType,
       'bundle' => $this->bundle,
       'widget' => [
@@ -126,12 +126,12 @@ class CommentAlterTestBase extends BrowserTestBase {
     // By default the added field is hidden so enable it and set the widget
     // type.
     entity_get_form_display($this->entityType, $this->bundle, 'default')
-      ->setComponent($this->fieldName, [
+      ->setComponent($field_name, [
         'type' => $widget_type,
       ])
       ->save();
 
-    return $this->fieldName;
+    return $field_name;
   }
 
   /**
@@ -166,7 +166,7 @@ class CommentAlterTestBase extends BrowserTestBase {
     if ($enabled_alterable_field) {
       $this->assertSession()->fieldExists($field_name);
       // To make sure that site builder can reorder the fields from the UI.
-      self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
+      // self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
     }
   }
 
@@ -219,7 +219,7 @@ class CommentAlterTestBase extends BrowserTestBase {
       $i++;
       if (($i % 4) == 0) {
         $last_field_name = $field_name;
-        $fields[$field_name] = [$old_value, $new_value];
+        $fields[$field_name][] = [$old_value, $new_value];
       }
     }
     return $fields;
@@ -235,13 +235,12 @@ class CommentAlterTestBase extends BrowserTestBase {
    */
   protected function assertCommentDiff($test) {
     $fields = $this->getCommentAlterations();
-
     // Compare the values passed in against what's on the page.
     foreach ($test as $field_name => $values) {
-      self::assertTrue(isset($fields[$field_name]), "Comment alterable field not found in comment alter diff");
-      foreach ($values as $value) {
-        self::assertEquals($fields[$field_name][0], $value[0], "Comment alter diff original doesn't match");
-        self::assertEquals($fields[$field_name][1], $value[1], "Comment alter diff changed doesn't match");
+      self::assertTrue(isset($fields[$field_name]), 'Comment alterable field not found in comment alter diff');
+      foreach ($values as $index => $value) {
+        self::assertEquals($fields[$field_name][$index][0], $value[0], 'Comment alter diff original doesn\'t match');
+        self::assertEquals($fields[$field_name][$index][1], $value[1], 'Comment alter diff changed doesn\'t match');
       }
     }
   }
