@@ -131,6 +131,9 @@ class CommentAlterTestBase extends BrowserTestBase {
       ])
       ->save();
 
+    // Invalidate cache after selecting comment_alter option for our field.
+    \Drupal::cache()->delete('comment_alter_fields:' . $this->entityType . ':' . $this->bundle);
+
     return $field_name;
   }
 
@@ -156,18 +159,14 @@ class CommentAlterTestBase extends BrowserTestBase {
    *
    * @param string $field_name
    *   Field added to the entity_test_bundle.
-   * @param boolean $enabled_alterable_field
-   *   Boolean indicating whether comment alter option is enabled for the field.
    */
-  protected function assertAlterableField($field_name, $enabled_alterable_field) {
+  protected function assertAlterableField($field_name) {
     $comment_display_form = entity_get_form_display('comment', 'comment', 'default');
     $comment_field = $this->entityType . '_' . $this->bundle . '_comment_alter_' . $field_name;
     $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
-    if ($enabled_alterable_field) {
-      $this->assertSession()->fieldExists($field_name);
-      // To make sure that site builder can reorder the fields from the UI.
-      // self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
-    }
+    $this->assertSession()->fieldExists($field_name);
+    // To make sure that site builder can reorder the fields from the UI.
+    self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
   }
 
   /**
@@ -243,6 +242,21 @@ class CommentAlterTestBase extends BrowserTestBase {
         self::assertEquals($fields[$field_name][$index][1], $value[1], 'Comment alter diff changed doesn\'t match');
       }
     }
+  }
+
+  /**
+   * Asserts that nothing breaks when a revision of parent entity is deleted.
+   */
+  protected function assertRevisionDelete() {
+    $old_revision_id = $this->entity->getRevisionId();
+    // Create a new revision as deleteRevision() can't delete active revision.
+    $this->entity->setNewRevision(TRUE);
+    $this->entity->save();
+    self::assertNotEquals($old_revision_id, $this->entity->getRevisionId());
+    // Now delete the old revision and see if we can open the entity page.
+    \Drupal::entityTypeManager()->getStorage($this->entityType)->deleteRevision($old_revision_id);
+    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
+    $this->assertSession()->statusCodeEquals(200);
   }
 
 }
