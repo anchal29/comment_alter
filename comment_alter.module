@@ -292,6 +292,7 @@ function comment_alter_form_comment_form_alter_validate($form, FormStateInterfac
   foreach ($original_value['comment_alter']['fields'] as $alterable_field) {
     $parent_form_state->setValue($alterable_field, $original_value['alterable_fields'][$alterable_field]);
   }
+  $parent_form_display->extractFormValues($parent_entity, $parent_form, $parent_form_state);
   $parent_form_display->validateFormValues($parent_entity, $parent_form, $parent_form_state);
 
 }

@@ -92,27 +92,31 @@ class CommentAlterTestBase extends BrowserTestBase {
    *   The field type name (Eg. text).
    * @param string $widget_type
    *   The widget name (Eg. text_textfield).
+   * @param array $storage_settings
+   *   (optional) A list of field storage settings that will be added to the
+   *   field.
    * @param array $field_settings
-   *   (optional) An array that gets added to the array passed to
-   *   FieldConfig::create().
+   *   (optional) A list of instance settings that will be added to the
+   *   field's instance.
    * @param boolean $comment_alter
    *   (optional) Option to enable/disable comment_alter for this field.
    *
    * @return string
    *   The name of the field that was created.
    */
-  protected function addField($field_type, $widget_type, $field_settings = array(), $comment_alter = TRUE) {
+  protected function addField($field_type, $widget_type, $storage_settings = [], $field_settings = [], $comment_alter = TRUE) {
     $field_name = Unicode::strtolower($this->randomMachineName() . '_field_name');
 
     FieldStorageConfig::create([
       'field_name' => $field_name,
       'entity_type' => $this->entityType,
       'type' => $field_type,
-    ] + $field_settings)->save();
+    ] + $storage_settings)->save();
     FieldConfig::create([
       'field_name' => $field_name,
       'entity_type' => $this->entityType,
       'bundle' => $this->bundle,
+      'settings' => $field_settings,
       'widget' => [
         'type' => $widget_type,
       ],
@@ -166,7 +170,7 @@ class CommentAlterTestBase extends BrowserTestBase {
     $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     $this->assertSession()->fieldExists($field_name);
     // To make sure that site builder can reorder the fields from the UI.
-    self::assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields are not present in the comment form display');
+    $this->assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields is present in the comment form display.');
   }
 
   /**
@@ -236,10 +240,10 @@ class CommentAlterTestBase extends BrowserTestBase {
     $fields = $this->getCommentAlterations();
     // Compare the values passed in against what's on the page.
     foreach ($test as $field_name => $values) {
-      self::assertTrue(isset($fields[$field_name]), 'Comment alterable field not found in comment alter diff');
+      $this->assertTrue(isset($fields[$field_name]), 'Comment alterable field is present in the comment alter diff.');
       foreach ($values as $index => $value) {
-        self::assertEquals($fields[$field_name][$index][0], $value[0], 'Comment alter diff original doesn\'t match');
-        self::assertEquals($fields[$field_name][$index][1], $value[1], 'Comment alter diff changed doesn\'t match');
+        $this->assertEquals($fields[$field_name][$index][0], $value[0], 'Comment alter diff original value matches.');
+        $this->assertEquals($fields[$field_name][$index][1], $value[1], 'Comment alter diff changed value matches.');
       }
     }
   }
@@ -252,7 +256,7 @@ class CommentAlterTestBase extends BrowserTestBase {
     // Create a new revision as deleteRevision() can't delete active revision.
     $this->entity->setNewRevision(TRUE);
     $this->entity->save();
-    self::assertNotEquals($old_revision_id, $this->entity->getRevisionId());
+    $this->assertNotEquals($old_revision_id, $this->entity->getRevisionId(), 'Make sure that two revisions are different.');
     // Now delete the old revision and see if we can open the entity page.
     \Drupal::entityTypeManager()->getStorage($this->entityType)->deleteRevision($old_revision_id);
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
