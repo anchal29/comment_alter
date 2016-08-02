@@ -18,6 +18,7 @@ use Drupal\Component\Diff\Diff;
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterface $form_state) {
+  /** @var FieldConfig $field */
   $field = $form_state->getFormObject()->getEntity();
 
   $form['third_party_settings']['comment_alter']['comment_alter_enabled'] = [
@@ -32,16 +33,20 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
     '#title' => t('Hide alterations of this field from diffs.'),
     '#weight' => 1,
     '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_hide', FALSE),
+    '#description' => t('Allows user to hide the differences shown on the comment. Instead of the differences a link to the revision comparison is displayed for nodes and for rest of the entities "Changes are hidden" is shown.'),
     '#states' => [
       'invisible' => [':input[name="third_party_settings[comment_alter][comment_alter_enabled]"]' => ['checked' => FALSE]],
     ],
   ];
   $form['third_party_settings']['#weight'] = $form['required']['#weight'] + 0.7;
 
-  // @TODO
-  // Move these three options to parent entity edit form.
+  // Previously (in the D7 version) these three checkboxes were available on the
+  // node type edit form. It's not only complicated to add them there in D8, but
+  // D8 even allows comments to be posted to any fieldable content entities.
+  // Because of that, it makes more sense to place these checkboxes on the
+  // comment field itself.
   $entity_type = explode('.', $field->getOriginalId());
-  if ($entity_type[0] == 'comment') {
+  if ($field->getType() == 'comment') {
     $form['third_party_settings']['comment_alter']['comment_alter_default'] = [
       '#type' => 'checkbox',
       '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
@@ -57,9 +62,9 @@ function comment_alter_form_field_config_edit_form_alter(&$form, FormStateInterf
     ];
     $form['third_party_settings']['comment_alter']['comment_alter_reply'] = [
       '#type' => 'checkbox',
-      '#title' => t('Allow altering fields when submitting reply comments'),
+      '#title' => t('Allow altering fields when submitting reply comments (if replying allowed)'),
       '#weight' => 4,
-      '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_root_only', FALSE),
+      '#default_value' => $field->getThirdPartySetting('comment_alter', 'comment_alter_reply', FALSE),
     ];
   }
 
@@ -109,16 +114,22 @@ function comment_alter_get_alterable_fields($entity_type, $bundle) {
  * Implements hook_form_BASE_FORM_ID_alter().
  */
 function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  /** @var \Drupal\comment\Entity\Comment $comment_entity */
   $comment_entity = $form_state->getFormObject()->getEntity();
+
+  // @todo Load the latest revision instead of the current if asked for.
+
+  $parent_entity = $comment_entity->getCommentedEntity();
+  /** @var FieldConfig $comment_field */
+  $comment_field = $parent_entity->getFieldDefinition($comment_entity->getFieldName());
   if (!$comment_entity->isNew()) {
       return;
   }
-  elseif ($comment_entity->hasParentComment()) {
-    // @todo Check if user has selected this option or not.
+  elseif ($comment_entity->hasParentComment() && !$comment_field->getThirdPartySetting('comment_alter', 'comment_alter_reply', FALSE)) {
+    // Bail out early if comment_altering is disallowed when posting replies.
     return;
   }
   else {
-    $parent_entity = $comment_entity->getCommentedEntity();
     $entity_type = $parent_entity->getEntityTypeId();
     $bundle = $parent_entity->bundle();
     $comment_alterable_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
@@ -415,6 +426,20 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
           $field['#states'][$filter]['#left'],
           $field['#states'][$filter]['#right']
         );
+        // Hide the differences if user chooses to hide them.
+        $parent_field = $parent_entity->getFieldDefinition($actual_field_name);
+        if ($parent_field->getThirdPartySetting('comment_alter', 'comment_alter_hide', FALSE)) {
+          $changes = t('Changes are hidden');
+          if($parent_entity->getEntityTypeId() == 'node') {
+            $url = \Drupal\Core\Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']);
+            $changes = \Drupal\Core\Link::fromTextAndUrl(t('View Changes'), $url);
+          }
+          $changed_fields[] = [
+            'name' => ['data' => ['#markup' => '<b>' . $field['#name'] . '</b>']],
+            'changes' => $changes,
+          ];
+          continue;
+        }
         $line = 0;
         foreach ($field_diff_rows as $row) {
           $changed_fields[] = [
@@ -476,6 +501,30 @@ function comment_alter_get_rows_diff($a, $b, $show_header = FALSE, &$line_stats 
   $diff = new Diff($a, $b);
 
   return $diff_formatter->format($diff);
+}
+
+/**
+ * Implements hook_comment_links_alter().
+ */
+function comment_alter_comment_links_alter(array &$links, CommentInterface $comment, array &$context) {
+  // Since Diff module shows the differences for nodes only so create diff link
+  // for nodes.
+  $parent_entity = $comment->getCommentedEntity();
+  if($parent_entity->getEntityTypeId() == 'node') {
+    $comment_field = $parent_entity->getFieldDefinition($comment->getFieldName());
+    if (!$comment_field->getThirdPartySetting('comment_alter', 'comment_alter_diff_link', FALSE)) {
+      return;
+    }
+    $links['comment_alter'] = array(
+      '#attributes' => array('class' => array('links', 'inline')),
+      '#links' => array(
+        'comment-diff' => array(
+          'title' => t('Diff'),
+          'url' => \Drupal\Core\Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']),
+        ),
+      ),
+    );
+  }
 }
 
 /**
