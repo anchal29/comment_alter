@@ -76,6 +76,7 @@ class CommentAlterTestBase extends BrowserTestBase {
       'administer comments',
       'post comments',
       'access comments',
+      'skip comment approval',
       'view test entity',
       'view test entity field',
       'administer entity_test content',
@@ -263,4 +264,21 @@ class CommentAlterTestBase extends BrowserTestBase {
     $this->assertSession()->statusCodeEquals(200);
   }
 
+  /**
+   * Asserts that added checkboxes on field config are working as expected.
+   *
+   * @param string $field_name
+   *   The comment alterable field added to the entity_test_bundle.
+   */
+  protected function assertCommentSettings($field_name) {
+    $comment_config = $this->entity->getFieldDefinition('comment');
+    $comment_config->setThirdPartySetting('comment_alter', 'comment_alter_reply', TRUE)->save();
+    $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment/1');
+    $this->assertSession()->fieldExists($field_name);
+
+    $alterable_field_config = $this->entity->getFieldDefinition($field_name);
+    $alterable_field_config->setThirdPartySetting('comment_alter', 'comment_alter_hide', TRUE)->save();
+    $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
+    $this->assertSession()->pageTextContains(t('Changes are hidden'));
+  }
 }

@@ -17,7 +17,7 @@ class CommentAlterTextTest extends CommentAlterTestBase {
   public static $modules = ['text'];
 
   /**
-   * Adds an Option Field to the parent enity.
+   * Adds an Text Field to the parent enity.
    *
    * @param int $cardinality
    *   Cardinality of the field.
@@ -57,6 +57,7 @@ class CommentAlterTextTest extends CommentAlterTestBase {
         [$old_value, $new_value]
       ],
     ]);
+    $this->assertCommentSettings($field_name);
     $this->assertRevisionDelete();
 
   }
@@ -97,6 +98,7 @@ class CommentAlterTextTest extends CommentAlterTestBase {
         [NULL, $new_value]
       ],
     ]);
+    $this->assertCommentSettings($field_name);
     $this->assertRevisionDelete();
   }
 

@@ -13,6 +13,7 @@ use Drupal\Core\Form\FormState;
 use Drupal\comment\CommentInterface;
 use Drupal\diff\EntityComparisonBase;
 use Drupal\Component\Diff\Diff;
+use Drupal\Core\Url;
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -117,11 +118,26 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
   /** @var \Drupal\comment\Entity\Comment $comment_entity */
   $comment_entity = $form_state->getFormObject()->getEntity();
 
-  // @todo Load the latest revision instead of the current if asked for.
-
   $parent_entity = $comment_entity->getCommentedEntity();
+  $entity_type = $parent_entity->getEntityTypeId();
   /** @var FieldConfig $comment_field */
   $comment_field = $parent_entity->getFieldDefinition($comment_entity->getFieldName());
+
+  // Load the latest revision instead of the current if asked for.
+  if ($comment_field->getThirdPartySetting('comment_alter', 'comment_alter_default', FALSE) && $parent_entity->getEntityType()->hasKey('revision')) {
+    // Nodes have columns nid and vid instead of revision_id and id.
+    $revision_id_field = ($entity_type == 'node') ? 'vid' : 'revision_id';
+    $id_field = ($entity_type == 'node') ? 'nid' : 'id';
+    $revision_id = \Drupal::database()->select($entity_type . '_revision', 'per')
+      ->fields('per', [$revision_id_field])
+      ->condition($id_field, $parent_entity->id())
+      ->orderBy($revision_id_field, 'DESC')
+      ->range(0, 1)
+      ->execute()
+      ->fetchField();
+    $parent_entity = Drupal::entityTypeManager()->getStorage($entity_type)->loadRevision($revision_id);
+  }
+
   if (!$comment_entity->isNew()) {
       return;
   }
@@ -130,7 +146,6 @@ function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_
     return;
   }
   else {
-    $entity_type = $parent_entity->getEntityTypeId();
     $bundle = $parent_entity->bundle();
     $comment_alterable_fields = comment_alter_get_alterable_fields($entity_type, $bundle);
     if (empty($comment_alterable_fields)) {
@@ -430,8 +445,8 @@ function comment_alter_get_changed_fields(CommentInterface $comment) {
         $parent_field = $parent_entity->getFieldDefinition($actual_field_name);
         if ($parent_field->getThirdPartySetting('comment_alter', 'comment_alter_hide', FALSE)) {
           $changes = t('Changes are hidden');
-          if($parent_entity->getEntityTypeId() == 'node') {
-            $url = \Drupal\Core\Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']);
+          if ($parent_entity->getEntityTypeId() == 'node') {
+            $url = Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']);
             $changes = \Drupal\Core\Link::fromTextAndUrl(t('View Changes'), $url);
           }
           $changed_fields[] = [
@@ -510,20 +525,20 @@ function comment_alter_comment_links_alter(array &$links, CommentInterface $comm
   // Since Diff module shows the differences for nodes only so create diff link
   // for nodes.
   $parent_entity = $comment->getCommentedEntity();
-  if($parent_entity->getEntityTypeId() == 'node') {
+  if ($parent_entity->getEntityTypeId() == 'node') {
     $comment_field = $parent_entity->getFieldDefinition($comment->getFieldName());
     if (!$comment_field->getThirdPartySetting('comment_alter', 'comment_alter_diff_link', FALSE)) {
       return;
     }
-    $links['comment_alter'] = array(
-      '#attributes' => array('class' => array('links', 'inline')),
-      '#links' => array(
-        'comment-diff' => array(
+    $links['comment_alter'] = [
+      '#attributes' => ['class' => ['links', 'inline']],
+      '#links' => [
+        'comment-diff' => [
           'title' => t('Diff'),
-          'url' => \Drupal\Core\Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']),
-        ),
-      ),
-    );
+          'url' => Url::fromUserInput('/node/' . $parent_entity->id() . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid']),
+        ],
+      ],
+    ];
   }
 }
 
