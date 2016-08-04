@@ -65,7 +65,7 @@ class CommentAlterImageTest extends CommentAlterTestBase {
 
     // Now fill other fields including the alt field of the image in the comment
     // form and save it to post a comment.
-    $edit['alterable_fields[' . $field_name . '][' . $field_number . '][alt]'] = $this->randomString();
+    $edit['comment_alter_fields[' . $field_name . '][' . $field_number . '][alt]'] = $this->randomString();
     $edit['comment_body[0][value]'] = $this->randomString();
     $edit['subject[0][value]'] = $this->randomString();
     $this->drupalPostForm(NULL, $edit, t('Save'));
@@ -79,7 +79,7 @@ class CommentAlterImageTest extends CommentAlterTestBase {
     $this->createEntityObject();
 
     $image = current($this->getImageFiles());
-    $this->postCommentWithImage($field_name, ['files[alterable_fields_' . $field_name . '_0]' => drupal_realpath($image->uri)]);
+    $this->postCommentWithImage($field_name, ['files[comment_alter_fields_' . $field_name . '_0]' => drupal_realpath($image->uri)]);
 
     $this->assertCommentDiff([
       $field_name => [
@@ -106,7 +106,7 @@ class CommentAlterImageTest extends CommentAlterTestBase {
     $edit[$field_name . '[0][alt]'] = $this->randomString();
     $this->drupalPostForm(NULL, $edit, t('Save'));
 
-    $this->postCommentWithImage($field_name, ['files[alterable_fields_' . $field_name . '_1][]' => drupal_realpath($image2->uri)], 1);
+    $this->postCommentWithImage($field_name, ['files[comment_alter_fields_' . $field_name . '_1][]' => drupal_realpath($image2->uri)], 1);
 
     $this->assertCommentDiff([
       $field_name => [

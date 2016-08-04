@@ -47,7 +47,7 @@ class CommentAlterTextTest extends CommentAlterTestBase {
     file_put_contents('/tmp/comment_form1.html', $content);
 
     $this->assertAlterableField($field_name);
-    $this->postComment(["alterable_fields[{$field_name}][0][value]" => $new_value]);
+    $this->postComment(["comment_alter_fields[{$field_name}][0][value]" => $new_value]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
     file_put_contents('/tmp/final_page1.html', $content);
@@ -86,7 +86,7 @@ class CommentAlterTextTest extends CommentAlterTestBase {
     // over them because of the #parent property specified in the
     // comment_form_alter.
     $this->postComment([
-      "alterable_fields[{$field_name}][1][value]" => $new_value
+      "comment_alter_fields[{$field_name}][1][value]" => $new_value
     ]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());

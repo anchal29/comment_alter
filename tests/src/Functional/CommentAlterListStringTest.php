@@ -52,7 +52,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
     file_put_contents('/tmp/comment_form3.html', $content);
 
     $this->assertAlterableField($field_name);
-    $this->postComment(["alterable_fields[{$field_name}]" => 2]);
+    $this->postComment(["comment_alter_fields[{$field_name}]" => 2]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
     file_put_contents('/tmp/final_page3.html', $content);
@@ -84,7 +84,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
     // over them because of the #parent property specified in the
     // comment_form_alter.
     $this->postComment([
-      "alterable_fields[{$field_name}][]" => [1, 2]
+      "comment_alter_fields[{$field_name}][]" => [1, 2]
     ]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
@@ -114,7 +114,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
     file_put_contents('/tmp/comment_form5.html', $content);
 
     $this->postComment([
-      "alterable_fields[{$field_name}]" => 2
+      "comment_alter_fields[{$field_name}]" => 2
     ]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
@@ -142,7 +142,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
     file_put_contents('/tmp/comment_form6.html', $content);
 
     $this->postComment([
-      "alterable_fields[{$field_name}][2]" => TRUE
+      "comment_alter_fields[{$field_name}][2]" => TRUE
     ]);
     // @todo For debugging/development only to be removed.
     $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
