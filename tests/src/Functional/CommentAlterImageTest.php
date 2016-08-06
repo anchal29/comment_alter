@@ -87,6 +87,7 @@ class CommentAlterImageTest extends CommentAlterTestBase {
         [NULL, 'File ID: 1'],
       ],
     ]);
+    $this->assertRevisionDelete();
   }
 
   /**
@@ -115,6 +116,7 @@ class CommentAlterImageTest extends CommentAlterTestBase {
         [NULL, 'File ID: 2'],
       ],
     ]);
+    $this->assertRevisionDelete();
   }
 
 }

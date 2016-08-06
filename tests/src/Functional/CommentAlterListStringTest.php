@@ -62,6 +62,8 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         [1, 2]
       ],
     ]);
+    $this->assertCommentSettings($field_name);
+    $this->assertRevisionDelete();
   }
 
   /**
@@ -96,6 +98,8 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         [NULL, 2],
       ],
     ]);
+    $this->assertCommentSettings($field_name);
+    $this->assertRevisionDelete();
   }
 
   /**
@@ -125,6 +129,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         [1, 2]
       ],
     ]);
+    $this->assertRevisionDelete();
   }
 
   /**
@@ -154,6 +159,7 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         [NULL, 2],
       ],
     ]);
+    $this->assertRevisionDelete();
   }
 
 }
