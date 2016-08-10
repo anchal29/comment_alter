@@ -117,24 +117,22 @@ function comment_alter_get_alterable_fields($entity_type, $bundle) {
 function comment_alter_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
   /** @var \Drupal\comment\Entity\Comment $comment_entity */
   $comment_entity = $form_state->getFormObject()->getEntity();
-
   $parent_entity = $comment_entity->getCommentedEntity();
   $entity_type = $parent_entity->getEntityTypeId();
   /** @var FieldConfig $comment_field */
   $comment_field = $parent_entity->getFieldDefinition($comment_entity->getFieldName());
-
   // Load the latest revision instead of the current if asked for.
   if ($comment_field->getThirdPartySetting('comment_alter', 'comment_alter_default', FALSE) && $parent_entity->getEntityType()->hasKey('revision')) {
     // Retrieve the revision and ID keys for the parent entity.
     $parent_entity_keys = $parent_entity->getEntityType()->getKeys();
     $revision_id = \Drupal::database()->select($entity_type . '_revision', 'per')
-      ->fields('per', [$parent_entity_keys('revision')])
-      ->condition($parent_entity_keys('id'), $parent_entity->id())
-      ->orderBy($parent_entity_keys('revision'), 'DESC')
+      ->fields('per', [$parent_entity_keys['revision']])
+      ->condition($parent_entity_keys['id'], $parent_entity->id())
+      ->orderBy($parent_entity_keys['revision'], 'DESC')
       ->range(0, 1)
       ->execute()
       ->fetchField();
-    $parent_entity = Drupal::entityTypeManager()->getStorage($entity_type)->loadRevision($revision_id);
+    $parent_entity = \Drupal::entityTypeManager()->getStorage($entity_type)->loadRevision($revision_id);
   }
 
   if (!$comment_entity->isNew()) {
