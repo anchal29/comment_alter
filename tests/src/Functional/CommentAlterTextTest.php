@@ -42,15 +42,9 @@ class CommentAlterTextTest extends CommentAlterTestBase {
     $new_value = $this->randomMachineName(6);
 
     $this->createEntityObject([$field_name => ['value' => $old_value]]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form1.html', $content);
 
     $this->assertAlterableField($field_name);
     $this->postComment(["comment_alter_fields[{$field_name}][0][value]" => $new_value]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page1.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [
@@ -77,9 +71,6 @@ class CommentAlterTextTest extends CommentAlterTestBase {
         0 => ['value' => $old_value]
       ]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form2.html', $content);
 
     $this->assertAlterableField($field_name);
     // The alterable fields on comment form have a wrapper of alterable_fields
@@ -88,9 +79,6 @@ class CommentAlterTextTest extends CommentAlterTestBase {
     $this->postComment([
       "comment_alter_fields[{$field_name}][1][value]" => $new_value
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page2.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [

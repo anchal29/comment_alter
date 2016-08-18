@@ -47,15 +47,9 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         'value' => 1
       ]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form3.html', $content);
 
     $this->assertAlterableField($field_name);
     $this->postComment(["comment_alter_fields[{$field_name}]" => 2]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page3.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [
@@ -77,9 +71,6 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         0 => ['value' => 1]
       ]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form4.html', $content);
 
     $this->assertAlterableField($field_name);
     // The alterable fields on comment form have a wrapper of alterable_fields
@@ -88,9 +79,6 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
     $this->postComment([
       "comment_alter_fields[{$field_name}][]" => [1, 2]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page4.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [
@@ -113,16 +101,10 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         'value' => 1
       ]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form5.html', $content);
 
     $this->postComment([
       "comment_alter_fields[{$field_name}]" => 2
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page5.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [
@@ -142,16 +124,10 @@ class CommentAlterListStringTest extends CommentAlterTestBase {
         0 => ['value' => 1]
       ]
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('comment/reply/entity_test_rev/' . $this->entity->id() . '/comment');
-    file_put_contents('/tmp/comment_form6.html', $content);
 
     $this->postComment([
       "comment_alter_fields[{$field_name}][2]" => TRUE
     ]);
-    // @todo For debugging/development only to be removed.
-    $content = $this->drupalGet('entity_test_rev/manage/' . $this->entity->id());
-    file_put_contents('/tmp/final_page6.html', $content);
 
     $this->assertCommentDiff([
       $field_name => [

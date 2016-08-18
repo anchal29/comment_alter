@@ -166,9 +166,9 @@ class CommentAlterTestBase extends BrowserTestBase {
    *   Field added to the entity_test_bundle.
    */
   protected function assertAlterableField($field_name) {
+    $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     $comment_display_form = entity_get_form_display('comment', 'comment', 'default');
     $comment_field = $this->entityType . '_' . $this->bundle . '_comment_alter_' . $field_name;
-    $this->drupalGet('comment/reply/' . $this->entityType . '/' . $this->entity->id() . '/comment');
     $this->assertSession()->fieldExists($field_name);
     // To make sure that site builder can reorder the fields from the UI.
     $this->assertTrue($comment_display_form->getComponent($comment_field), 'Alterable fields is present in the comment form display.');
