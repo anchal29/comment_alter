@@ -53,15 +53,3 @@ function comment_alter_schema() {
 
   return $schema;
 }
-
-/**
- * Implements hook_uninstall().
- */
-function comment_alter_uninstall() {
-
-  // @TODO.
-
-  // Unlike D7 version of the module, here it might not even be needed as we
-  // will be using third party settings.
-  // Provide in case needed.
-}

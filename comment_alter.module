@@ -577,14 +577,6 @@ function comment_alter_entity_revision_delete(EntityInterface $entity) {
   }
 
 }
-/**
- * Implements hook_form_alter().
- */
-function comment_alter_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  return;
-  // @todo Find suitable form alter.
-
-}
 
 /**
  * Implements hook_entity_extra_field_info().
